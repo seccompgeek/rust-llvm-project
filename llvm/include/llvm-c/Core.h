@@ -2455,6 +2455,11 @@ void LLVMDeleteFunction(LLVMValueRef Fn);
  * Set smart pointer metadata on alloca instructions: SORLAB: @kayondomartin
  */
 void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca);
+/**
+ * @brief Mark Smart pointer function with metadata: SORLAB: @kayondomartin
+ * 
+ */
+ void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, size_t index);
 
 /**
  * Check whether the given function has a personality function.
