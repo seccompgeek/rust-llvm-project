@@ -2459,7 +2459,7 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca);
  * @brief Mark Smart pointer function with metadata: SORLAB: @kayondomartin
  * 
  */
- void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, size_t index);
+ void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, const char* TypeName, size_t NameLen);
 
 /**
  * Check whether the given function has a personality function.

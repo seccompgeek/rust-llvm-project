@@ -878,11 +878,12 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca) {
   unwrap<Instruction>(Alloca)->setMetadata("RustMeta-Smart-Pointer", N);
 }
 
-void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, size_t index){
+void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, const char* TypeName, size_t NameLen){
   Function* F = unwrap<Function>(Fn);
   LLVMContext &C = F->getContext();
-  std::string index_string = std::to_string(index);
-  MDNode *N = MDNode::get(C, MDString::get(C, index_string));
+  std::string typeName(TypeName);
+  assert(typeName.length() == NameLen && "Something wrong converting const char to string??");
+  MDNode *N = MDNode::get(C, MDString::get(C, typeName));
   F->addMetadata("SmartPointerAPIFunc", *N);
 }
 
