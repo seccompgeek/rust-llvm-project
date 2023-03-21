@@ -8,7 +8,7 @@ using namespace llvm;
 
 PreservedAnalyses MetaUpdateSMAPIFuncPass::run(Function &F,
                                                FunctionAnalysisManager &AM) {
-  if (!F.is_declaration()) {
+  if (!F.isDeclaration()) {
     std::map<Instruction *, unsigned long long> candidate_map;
     Instruction *tdi_call_before = nullptr;
     bool still_alloca = true;
@@ -18,7 +18,7 @@ PreservedAnalyses MetaUpdateSMAPIFuncPass::run(Function &F,
           still_alloca = false;
           tdi_call_before = &I;
         }
-        if (auto callbase = dyn_cast<Callbase>(&I)) {
+        if (auto callbase = dyn_cast<CallBase>(&I)) {
           if (auto callee = callbase->getCalledFunction()) {
             if (auto SMMD = callee->getMetadata("SmartPointerAPIFunc")) {
               auto value = cast<MDString>(SMMD->getOperand(0))->getString();
@@ -34,8 +34,8 @@ PreservedAnalyses MetaUpdateSMAPIFuncPass::run(Function &F,
     if (!candidate_map.empty()) {
       FunctionType *tdi_slot_type = FunctionType::get(
           Type::getVoidTy(F.getContext())->getPointerTo(0), false);
-      auto CB = Function.getParent().getOrInsertFunction(
-          "mi_get_tdi_index_slot", tdi_slot_type);
+      auto CB = F.getParent()->getOrInsertFunction("mi_get_tdi_index_slot",
+                                                   tdi_slot_type);
       IRBuilder<> IRB(tdi_call_before);
       auto index_slot = IRB.CreateCall(CB, None, "tdi_index_slot", nullptr);
       for (auto it : candidate_map) {
@@ -45,5 +45,5 @@ PreservedAnalyses MetaUpdateSMAPIFuncPass::run(Function &F,
       }
     }
   }
-  return PreservedAnalyses::All();
+  return PreservedAnalyses::all();
 }
