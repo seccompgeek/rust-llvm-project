@@ -23,18 +23,23 @@ PreservedAnalyses MetaUpdateSMAPIFuncPass::run(Function &F,
           if (auto callee = callbase->getCalledFunction()) {
             if (auto SMMD = callee->getMetadata("SmartPointerAPIFunc")) {
               auto value = cast<MDString>(SMMD->getOperand(0))->getString();
-              if(currentFuncSMMD != nullptr && currentFuncSMMD->getOperand(0) == SMMD->getOperand(0)){
+              if (currentFuncSMMD != nullptr &&
+                  currentFuncSMMD->getOperand(0) == SMMD->getOperand(0)) {
                 continue;
               }
 
               if (value.startswith("000")) {
                 candidate_map.insert(std::make_pair(&I, 1));
-              } else if(TypeMetadataToTDIIndexMap.find(value) != TypeMetadataToTDIIndexMap.end()){
+              } else if (TypeMetadataToTDIIndexMap.find(value) !=
+                         TypeMetadataToTDIIndexMap.end()) {
 
-                candidate_map.insert(std::make_pair(&I, TypeMetadataToTDIIndexMap[value]))
-              }else{
-                auto next_index = TypeMetadataToTDIIndexMap.size()+2; //0 is default, 1 is for smart pointers
-                TypeMetadataToTDIIndexMap.insert(std::make_pair(value,next_index));
+                candidate_map.insert(
+                    std::make_pair(&I, TypeMetadataToTDIIndexMap[value]));
+              } else {
+                auto next_index = TypeMetadataToTDIIndexMap.size() +
+                                  2; // 0 is default, 1 is for smart pointers
+                TypeMetadataToTDIIndexMap.insert(
+                    std::make_pair(value, next_index));
                 candidate_map.insert(std::make_pair(&I, next_index));
               }
             }
