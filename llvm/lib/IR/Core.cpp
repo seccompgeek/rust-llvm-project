@@ -897,7 +897,7 @@ void LLVMMarkSmartPointerType(LLVMTypeRef Ty){
   Type* type = unwrap<Type>(Ty);
   LLVMContext &C = type->getContext();
   MDNode* N = MDNode::get(C, MDString::get(C, "Is Smart Pointer Type"));
-  type->setMetadata("IsSmartPointerType", N);
+  type->addMetadata("IsSmartPointerType", *N);
 }
 
 void LLVMDumpValue(LLVMValueRef Val) {
