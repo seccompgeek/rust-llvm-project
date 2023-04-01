@@ -878,13 +878,26 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca) {
   unwrap<Instruction>(Alloca)->setMetadata("RustMeta-Smart-Pointer", N);
 }
 
-void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, const char* TypeName, size_t NameLen){
+void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, LLVMTypeRef type){
   Function* F = unwrap<Function>(Fn);
   LLVMContext &C = F->getContext();
-  std::string typeName(TypeName);
-  assert(typeName.length() == NameLen && "Something wrong converting const char to string??");
-  MDNode *N = MDNode::get(C, MDString::get(C, typeName));
+  Type* Ty = unwrap<Type>(type);
+  MDNode *N = MDNode::get(C, MDString::get(C, ConstantAsMetadata::get(Ty)));
   F->addMetadata("SmartPointerAPIFunc", *N);
+}
+
+void LLVMSetExchangeMallocFunctionMetadata(LLVMValueRef Fn){
+  Function *F = unwrap<Function>(Fn);
+  LLVMContext &C = F->getContext();
+  MDNode *N = MDNode::get(C, MDString::get(C, "Is Exchange Malloc Function"));
+  F->addMetadata("ExchangeMallocFunc", *N);
+}
+
+void LLVMMarkSmartPointerType(LLVMTypeRef Ty){
+  Type* type = unwrap<Type>(Ty);
+  LLVMContext &C = type->getContext();
+  MDNode* N = MDNode::get(C, MDString::get(C, "Is Smart Pointer Type"));
+  type->setMetadata("IsSmartPointerType", N);
 }
 
 void LLVMDumpValue(LLVMValueRef Val) {
