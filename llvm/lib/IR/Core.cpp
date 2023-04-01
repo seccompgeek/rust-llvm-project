@@ -882,7 +882,8 @@ void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, LLVMTypeRef type){
   Function* F = unwrap<Function>(Fn);
   LLVMContext &C = F->getContext();
   Type* Ty = unwrap<Type>(type);
-  Metadata* operands[] = {Ty};
+  ConstantAsMetadata *CAMD = ConstantAsMetadata::get(Constant::getNullValue(Ty));
+  Metadata* operands = {CAMD};
   MDNode *N = MDNode::get(C, operands);
   F->addMetadata("SmartPointerAPIFunc", *N);
 }
