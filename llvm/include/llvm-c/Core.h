@@ -2463,7 +2463,7 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca);
 /**
  * @brief Mark smart pointer type as one: SORLAB: @kayondomartin
 */
-void LLVMMarkSmartPointerType(LLVMTypeRef Ty);
+void LLVMMarkSmartPointerType(LLVMValueRef Fn, LLVMTypeRef Ty);
 
  /**
   * Set exchange_malloc function metadata : simply marks exchange_malloc func: SORLAB: @kayondomartin

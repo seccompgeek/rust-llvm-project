@@ -883,7 +883,7 @@ void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, LLVMTypeRef type){
   LLVMContext &C = F->getContext();
   Type* Ty = unwrap<Type>(type);
   ConstantAsMetadata *CAMD = ConstantAsMetadata::get(Constant::getNullValue(Ty));
-  Metadata* operands = {CAMD};
+  Metadata* operands[] = {CAMD};
   MDNode *N = MDNode::get(C, operands);
   F->addMetadata("SmartPointerAPIFunc", *N);
 }
@@ -895,11 +895,26 @@ void LLVMSetExchangeMallocFunctionMetadata(LLVMValueRef Fn){
   F->addMetadata("ExchangeMallocFunc", *N);
 }
 
-void LLVMMarkSmartPointerType(LLVMTypeRef Ty){
+void LLVMMarkSmartPointerType(LLVMValueRef Fn, LLVMTypeRef Ty){
+  Function* F = unwrap<Function>(Fn);
+  Module *M = F->getParent();
   Type* type = unwrap<Type>(Ty);
   LLVMContext &C = type->getContext();
-  MDNode* N = MDNode::get(C, MDString::get(C, "Is Smart Pointer Type"));
-  type->addMetadata("IsSmartPointerType", *N);
+  auto smartpointerMDNode = M->getOrInsertNamedMetadata("SmartPointers");
+  for(auto op: smartpointerMDNode->operands()){
+    for(unsigned int i=0; i<op->getNumOperands(); i++){
+      Metadata* md = op->getOperand(i);
+      if(MetadataAsValue *mdv = dyn_cast<MetadataAsValue>(md)){
+        Value* val = mdv->getValue();
+        if(val->getType() == type){
+          return;
+        }
+      }
+    }
+  }
+  Metadata* operands[] = {ConstantAsMetadata::get(Constant::getNullValue(Ty))};
+  MDNode* N = MDNode::get(C, operands);
+  smartpointerMDNode->addOperand(N);
 }
 
 void LLVMDumpValue(LLVMValueRef Val) {
