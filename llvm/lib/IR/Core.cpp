@@ -902,7 +902,8 @@ void LLVMMarkSmartPointerType(LLVMValueRef Fn, LLVMTypeRef Ty){
   LLVMContext &C = type->getContext();
   auto smartpointerMDNode = M->getOrInsertNamedMetadata("SmartPointers");
   for(auto op: smartpointerMDNode->operands()){
-    if(MetadataAsValue* mdv = dyn_cast<MetadataAsValue>(op)){
+    auto val = cast<Value>(op);
+    if(auto mdv = dyn_cast<MetadataAsValue>(val)){
       Metadata* md = mdv->getMetadata();
       if(ConstantAsMetadata* cam = dyn_cast<ConstantAsMetadata>(md)){
         if(cam->getValue()->getType() == type){
