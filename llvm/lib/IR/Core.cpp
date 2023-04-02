@@ -903,14 +903,15 @@ void LLVMMarkSmartPointerType(LLVMValueRef Fn, LLVMTypeRef Ty){
   auto smartpointerMDNode = M->getOrInsertNamedMetadata("SmartPointers");
   for(auto op: smartpointerMDNode->operands()){
     for(unsigned int i=0; i<op->getNumOperands(); i++){
-      if(Value *val = dyn_cast<MDNode>(op->getOperand(i))){
-        if(val->getType() == type){
-          return;
-        }
+      MetadataAsValue* mdv = op->getOperand(i);
+      ConstantAsMetadata* cam = dyn_cast<ConstantAsMetadata>(mdv);
+      Constant* cons = cam->getConstant();
+      if(cons->getType() == type){
+        return;
       }
     }
   }
-  Metadata* operands[] = {ConstantAsMetadata::get(Constant::getNullValue(Ty))};
+  Metadata* operands[] = {ConstantAsMetadata::get(Constant::getNullValue(type))};
   MDNode* N = MDNode::get(C, operands);
   smartpointerMDNode->addOperand(N);
 }
