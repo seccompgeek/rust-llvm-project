@@ -903,9 +903,7 @@ void LLVMMarkSmartPointerType(LLVMValueRef Fn, LLVMTypeRef Ty){
   auto smartpointerMDNode = M->getOrInsertNamedMetadata("SmartPointers");
   for(auto op: smartpointerMDNode->operands()){
     for(unsigned int i=0; i<op->getNumOperands(); i++){
-      Metadata* md = op->getOperand(i);
-      if(MetadataAsValue *mdv = dyn_cast<MetadataAsValue>(md)){
-        Value* val = mdv->getValue();
+      if(Value *val = dyn_cast<MDNode>(op->getOperand(i))){
         if(val->getType() == type){
           return;
         }
