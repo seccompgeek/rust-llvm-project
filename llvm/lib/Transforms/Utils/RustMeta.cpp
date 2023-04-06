@@ -22,26 +22,45 @@ PreservedAnalyses MetaUpdateSMAPIFuncPass::run(Function &F,
         if (auto callbase = dyn_cast<CallBase>(&I)) {
           if (auto callee = callbase->getCalledFunction()) {
             if (auto SMMD = callee->getMetadata("SmartPointerAPIFunc")) {
-              auto value = cast<MDString>(SMMD->getOperand(0))->getString();
+              auto value_type = cast<MetadataAsValue>(SMMD->getOperand(0))->getType();
               if (currentFuncSMMD != nullptr &&
                   currentFuncSMMD->getOperand(0) == SMMD->getOperand(0)) {
                 continue;
               }
 
-              if (value.startswith("000")) {
-                candidate_map.insert(std::make_pair(&I, 1));
-              } else if (TypeMetadataToTDIIndexMap.find(value) !=
+              bool index_set = false;
+              if(auto smartpointers = F.getParent()->getNamedMetadata("SmartPointers")){
+                for(auto op: smartpointers->operands()){
+                  auto val = cast<Value>(op);
+                  if(auto mdv = dyn_cast<MetadataAsValue>(val)){
+                    Metadata* md = mdv->getMetadata();
+                    if(ConstantAsMetadata* cam = dyn_cast<ConstantAsMetadata>(md)){
+                      if(cam->getValue()->getType() == value_type){
+                        candidate_map.insert(std::make_pair(&I, 1));
+                        index_set = true;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+
+              if(!index_set){
+                if (TypeMetadataToTDIIndexMap.find(value_type) !=
                          TypeMetadataToTDIIndexMap.end()) {
 
-                candidate_map.insert(
-                    std::make_pair(&I, TypeMetadataToTDIIndexMap[value]));
-              } else {
-                auto next_index = TypeMetadataToTDIIndexMap.size() +
-                                  2; // 0 is default, 1 is for smart pointers
-                TypeMetadataToTDIIndexMap.insert(
-                    std::make_pair(value, next_index));
-                candidate_map.insert(std::make_pair(&I, next_index));
+                  candidate_map.insert(
+                      std::make_pair(&I, TypeMetadataToTDIIndexMap[value_type]));
+                } else {
+                  auto next_index = TypeMetadataToTDIIndexMap.size() +
+                                    2; // 0 is default, 1 is for smart pointers
+                  TypeMetadataToTDIIndexMap.insert(
+                      std::make_pair(value_type, next_index));
+                  candidate_map.insert(std::make_pair(&I, next_index));
+                }
               }
+            }else if(callee->getMetadata("ExchangeMallocFunc")){
+              //TODO: track uses of this call untill you reach a store.
             }
           }
         }
