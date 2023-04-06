@@ -3,10 +3,12 @@
 
 #include "llvm/IR/PassManager.h"
 #include <map>
+#include <set>
 
 namespace llvm {
 class MetaUpdateSMAPIFuncPass : public PassInfoMixin<MetaUpdateSMAPIFuncPass> {
-  std::map<llvm::Type*, unsigned long long> TypeMetadataToTDIIndexMap;
+  std::map<std::string, unsigned long long> TypeMetadataToTDIIndexMap;
+  std::set<std::string> SmartPointerTypes;
 
 public:
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);

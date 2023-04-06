@@ -22,10 +22,15 @@ PreservedAnalyses MetaUpdateSMAPIFuncPass::run(Function &F,
         if (auto callbase = dyn_cast<CallBase>(&I)) {
           if (auto callee = callbase->getCalledFunction()) {
             if (auto SMMD = callee->getMetadata("SmartPointerAPIFunc")) {
-              auto value_type = cast<MetadataAsValue>(SMMD->getOperand(0))->getType();
+              auto value = cast<MDString>(SMMD->getOperand(0))->getString();
               if (currentFuncSMMD != nullptr &&
                   currentFuncSMMD->getOperand(0) == SMMD->getOperand(0)) {
                 continue;
+              }
+            /*
+              if(value.startswith("000")) //this is a smartpointer type{
+                value = value.substr(3);
+                 sma
               }
 
               bool index_set = false;
@@ -58,7 +63,7 @@ PreservedAnalyses MetaUpdateSMAPIFuncPass::run(Function &F,
                       std::make_pair(value_type, next_index));
                   candidate_map.insert(std::make_pair(&I, next_index));
                 }
-              }
+              } */
             }else if(callee->getMetadata("ExchangeMallocFunc")){
               //TODO: track uses of this call untill you reach a store.
             }
