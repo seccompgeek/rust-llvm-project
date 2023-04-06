@@ -6,12 +6,13 @@
 #include <set>
 
 namespace llvm {
-class MetaUpdateSMAPIFuncPass : public PassInfoMixin<MetaUpdateSMAPIFuncPass> {
+class MetaUpdateSMAPIPass : public PassInfoMixin<MetaUpdateSMAPIPass> {
   std::map<std::string, unsigned long long> TypeMetadataToTDIIndexMap;
   std::set<std::string> SmartPointerTypes;
+  std::string typeToString(Type* type);
 
 public:
-  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 };
 
 } // namespace llvm
