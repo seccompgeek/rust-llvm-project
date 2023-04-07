@@ -2464,6 +2464,10 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca);
   * @brief Mark exchange_malloc function
  */
 void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn);
+/**
+ * @brief Mark exchange_malloc call
+*/
+void LLVMMarkExchangeMallocCall(LLVMValueRef Call, const char* TypeName);
 
 /**
  * Check whether the given function has a personality function.

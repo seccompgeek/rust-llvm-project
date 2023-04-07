@@ -872,6 +872,14 @@ void LLVMSetValueName(LLVMValueRef Val, const char *Name) {
   unwrap(Val)->setName(Name);
 }
 
+void LLVMMarkExchangeMallocCall(LLVMValueRef Call, const char* TypeName){
+  CallBase* call = unwrap<CallBase>(Call);
+  LLVMContext &C = call->getContext();
+  std::string typeName(TypeName);
+  MDNode* N = MDNode::get(C, MDString::get(C, typeName));
+  call->setMetadata("ExchangeMallocCall", N);
+}
+
 void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca) {
   LLVMContext &C = unwrap<Instruction>(Alloca)->getContext();
   MDNode *N = MDNode::get(C, MDString::get(C, "Is smart pointer alloca"));
