@@ -872,10 +872,14 @@ void LLVMSetValueName(LLVMValueRef Val, const char *Name) {
   unwrap(Val)->setName(Name);
 }
 
-void LLVMMarkExchangeMallocCall(LLVMValueRef Call, const char* TypeName){
+void LLVMMarkExchangeMallocCall(LLVMValueRef Call, LLVMTypeRef TypeRef, bool IsSpecial){
   CallBase* call = unwrap<CallBase>(Call);
   LLVMContext &C = call->getContext();
-  std::string typeName(TypeName);
+  Type* type = unwrap<Type>(TypeRef);
+  std::string str;
+  llvm::raw_string_ostream rso(str);
+  type->print(rso);
+  std::string typeName = IsSpecial? std::string("000")+rso.str(): rso.str();
   MDNode* N = MDNode::get(C, MDString::get(C, typeName));
   call->setMetadata("ExchangeMallocCall", N);
 }
