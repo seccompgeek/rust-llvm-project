@@ -872,7 +872,7 @@ void LLVMSetValueName(LLVMValueRef Val, const char *Name) {
   unwrap(Val)->setName(Name);
 }
 
-void LLVMMarkExchangeMallocCall(LLVMValueRef Call, LLVMTypeRef TypeRef, bool IsSpecial){
+void LLVMMarkExchangeMallocCall(LLVMValueRef Call, LLVMTypeRef TypeRef, LLVMBool IsSpecial){
   CallBase* call = unwrap<CallBase>(Call);
   LLVMContext &C = call->getContext();
   Type* type = unwrap<Type>(TypeRef);
