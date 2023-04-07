@@ -15,7 +15,7 @@ std::string MetaUpdateSMAPIPass::typeToString(Type* type){
 }
 
 PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
-                                               FModuleAnalysisManager &AM) {
+                                               ModuleAnalysisManager &AM) {
   //collect smart pointer types
   for(auto &F: M){
     if(auto SMMD = F.getMetadata("SmartPointerAPIFunc")){
@@ -72,7 +72,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
                 //handle exchange_malloc
                 if(callee->getMetadata("ExchangeMallocFunc")){
                   for(auto users: II.users()){
-                    
+
                   }
                 }
               }
