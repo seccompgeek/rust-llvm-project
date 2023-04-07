@@ -2467,7 +2467,7 @@ void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn);
 /**
  * @brief Mark exchange_malloc call
 */
-void LLVMMarkExchangeMallocCall(LLVMValueRef Call, LLVMTypeRef TypeRef, bool IsSpecial);
+void LLVMMarkExchangeMallocCall(LLVMValueRef Call, LLVMTypeRef TypeRef, LLVMBool IsSpecial);
 
 /**
  * Check whether the given function has a personality function.
