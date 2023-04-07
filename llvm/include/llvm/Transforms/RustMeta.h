@@ -7,8 +7,8 @@
 
 namespace llvm {
 class MetaUpdateSMAPIPass : public PassInfoMixin<MetaUpdateSMAPIPass> {
-  std::map<std::string, unsigned long long> TypeMetadataToTDIIndexMap;
-  std::set<std::string> SmartPointerTypes;
+  std::map<StringRef, unsigned long long> TypeMetadataToTDIIndexMap;
+  std::set<StringRef> SmartPointerTypes;
   std::string typeToString(Type* type);
 
 public:
