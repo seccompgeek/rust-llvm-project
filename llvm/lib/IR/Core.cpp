@@ -872,15 +872,10 @@ void LLVMSetValueName(LLVMValueRef Val, const char *Name) {
   unwrap(Val)->setName(Name);
 }
 
-void LLVMMarkExchangeMallocCall(LLVMValueRef Call, LLVMTypeRef TypeRef, LLVMBool IsSpecial){
+void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId){
   CallBase* call = unwrap<CallBase>(Call);
   LLVMContext &C = call->getContext();
-  Type* type = unwrap<Type>(TypeRef);
-  std::string str;
-  llvm::raw_string_ostream rso(str);
-  type->print(rso);
-  std::string typeName = IsSpecial? std::string("000")+rso.str(): rso.str();
-  MDNode* N = MDNode::get(C, MDString::get(C, typeName));
+  MDNode* N = MDNode::get(C, MDString::get(C, std::to_string(TypeId)));
   call->setMetadata("ExchangeMallocCall", N);
 }
 
@@ -890,11 +885,10 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca) {
   unwrap<Instruction>(Alloca)->setMetadata("RustMeta-Smart-Pointer", N);
 }
 
-void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, const char* TypeName){
+void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, unsigned long long TypeId){
   Function* F = unwrap<Function>(Fn);
   LLVMContext &C = F->getContext();
-  std::string typeName(TypeName);
-  MDNode *N = MDNode::get(C, MDString::get(C, typeName));
+  MDNode *N = MDNode::get(C, MDString::get(C, std::to_string(TypeId)));
   F->addMetadata("SmartPointerAPIFunc", *N);
 }
 
