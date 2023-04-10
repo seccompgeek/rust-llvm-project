@@ -16,72 +16,53 @@ std::string MetaUpdateSMAPIPass::typeToString(Type* type){
 
 PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
                                                ModuleAnalysisManager &AM) {
-  //collect smart pointer types
-  for(auto &F: M){
-    if(auto SMMD = F.getMetadata("SmartPointerAPIFunc")){
-      auto value = cast<MDString>(SMMD->getOperand(0))->getString();
-      if(value.startswith("000")){
-        value = value.substr(3);
-        SmartPointerTypes.insert(value);
-      }
-    }
-    for(auto &I: F){
-      if(auto alloca = dyn_cast<AllocaInst>(&I)){
-        if(alloca->hasMetadata("RustMeta-Smart-Pointer")){
-          auto value = typeToString(alloca->getAllocatedType());
-          SmartPointerTypes.insert(value);
+  for (auto &Func: M){
+    if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
+
+    std::map<Instruction*, size_t> candidateCallSites;
+    Instruction* getTDISlotInsertPoint = nullptr;
+    bool Allocas = true;
+    for(auto &BB: Func){
+      for (auto &Inst: BB){
+        if(Allocas && !isa<AllocaInst>(&Inst)){
+          Allocas = false;
+          getTDISlotInsertPoint = &Inst;
         }
-      }
-    }
-  }
-
-  //insert TDI index before SP-API calls
-  for(auto &F: M){
-    if(!F.isDeclaration() && !F.getMetadata("SmartPointerAPIFunc")){
-      std::map<Instruction*, unsigned long long> candidate_map;
-      Instruction *tdi_call_before = nullptr;
-      bool still_alloca = true;
-
-      for (auto &BB: F){
-        for(auto &II: BB){
-          if(!isa<AllocaInst>(&II) && still_alloca){
-            still_alloca = false;
-            tdi_call_before = &II;
-          }
-
-          if(auto callbase = dyn_cast<CallBase>(&II)){
-            if(auto callee = callbase->getCalledFunction()){
-              if(auto SMMD = callee->getMetadata("SmartPointerAPIFunc")){
-                auto value = cast<MDString>(SMMD->getOperand(0))->getString();
-                if(value.startswith("000")){
-                  value = value.substr(3);
-                }
-                if(SmartPointerTypes.find(value) != SmartPointerTypes.end()){
-                  candidate_map.insert(std::make_pair(&II, 1));
-                }else{
-                  unsigned long long tdi_index = 0;
-                  if(TypeMetadataToTDIIndexMap.find(value) == TypeMetadataToTDIIndexMap.end()){
-                    tdi_index = TypeMetadataToTDIIndexMap.size() + 2;
-                    TypeMetadataToTDIIndexMap.insert(std::make_pair(value, tdi_index));
-                  }else{
-                    tdi_index = TypeMetadataToTDIIndexMap[value];
-                  }
-                  candidate_map.insert(std::make_pair(&II, tdi_index));
-                }
+        if(auto call = dyn_cast<CallBase>(&Inst)){
+          if(auto SMMD = call->getMetadata("ExchangeMallocCall")){
+            auto TypeID = cast<MDString>(SMMD->getOperand(0))->getString();
+            if(TypeID.equals("000")){
+              candidateCallSites.insert(std::make_pair(&Inst, 1));
+            }else{
+              auto it = TypeMetadataToTDIIndexMap.find(TypeID);
+              size_t TDIIndex = -1;
+              if(it == TypeMetadataToTDIIndexMap.end()){
+                TDIIndex = TypeMetadataToTDIIndexMap.size() + 2; //0 is for FFIs, 1 is for smart pointers
+                TypeMetadataToTDIIndexMap.insert(std::make_pair(TypeID, TDIIndex));
               }else{
-                //handle exchange_malloc
-                if(callee->getMetadata("ExchangeMallocFunc")){
-                  for(auto users: II.users()){
-
-                  }
-                }
+                TDIIndex = it->second;
               }
+              candidateCallSites.insert(std::make_pair(&Inst, TDIIndex));
             }
           }
         }
       }
     }
+
+    if(candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
+      auto &Context = M.getContext();
+      auto getTDISlotCallee = M.getOrInsertFunction("mi_get_tdi_index_slot", FunctionType::get(Type::getVoidTy(Context)->getPointerTo(0), false));
+
+      IRBuilder<> Builder(getTDISlotInsertPoint);
+      auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
+      auto TDISlot = Builder.CreateBitCast(TDISlotCall, Type::getInt64PtrTy(Context), "tdi_slot");
+
+      for(auto it: candidateCallSites){
+        Builder.SetInsertPoint(it.first);
+        auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), it.second, false);
+        Builder.CreateStore(Index, TDISlot, true);
+      }
+    }
   }
-  
   return PreservedAnalyses::all();
 }
