@@ -31,7 +31,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         if(auto call = dyn_cast<CallBase>(&Inst)){
           if(auto SMMD = call->getMetadata("ExchangeMallocCall")){
             auto TypeID = cast<MDString>(SMMD->getOperand(0))->getString();
-            if(TypeID.equals("000")){
+            if(TypeID.equals("0")){
               candidateCallSites.insert(std::make_pair(&Inst, 1));
             }else{
               auto it = TypeMetadataToTDIIndexMap.find(TypeID);
@@ -56,11 +56,23 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
       IRBuilder<> Builder(getTDISlotInsertPoint);
       auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
       auto TDISlot = Builder.CreateBitCast(TDISlotCall, Type::getInt64PtrTy(Context), "tdi_slot");
+      auto ResetValue = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);
 
       for(auto it: candidateCallSites){
         Builder.SetInsertPoint(it.first);
         auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), it.second, false);
         Builder.CreateStore(Index, TDISlot, true);
+        if(auto callInst = dyn_cast<CallInst>(it.first)){
+          Builder.SetInsertPoint(it.first->getNextNode());
+          Builder.CreateStore(ResetValue, TDISlot, false);
+        }else{
+          assert(isa<InvokeInst>(it.first) && "Expecting anything other than call or invoke?");
+          auto invokeInst = dyn_cast<InvokeInst>(it.first);
+          Builder.SetInsertPoint(&*invokeInst->getNormalDest()->begin());
+          Builder.CreateStore(ResetValue, TDISlot, false);
+          Builder.SetInsertPoint(&*invokeInst->getUnwindDest()->begin());
+          Builder.CreateStore(ResetValue, TDISlot, false);
+        }
       }
     }
   }
