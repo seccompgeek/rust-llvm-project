@@ -70,7 +70,11 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
           auto invokeInst = dyn_cast<InvokeInst>(it.first);
           Builder.SetInsertPoint(&*invokeInst->getNormalDest()->begin());
           Builder.CreateStore(ResetValue, TDISlot, false);
-          Builder.SetInsertPoint(&*invokeInst->getUnwindDest()->begin());
+          auto nextInsertPoint = &*invokeInst->getUnwindDest()->begin();
+          if (isa<LandingPadInst>(nextInsertPoint)){
+            nextInsertPoint = nextInsertPoint->getNextNode();
+          }
+          Builder.SetInsertPoint(nextInsertPoint);
           Builder.CreateStore(ResetValue, TDISlot, false);
         }
       }
