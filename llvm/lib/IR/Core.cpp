@@ -879,6 +879,13 @@ void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId){
   call->setMetadata("ExchangeMallocCall", N);
 }
 
+void LLVMRustMarkExternFunc(LLVMValueRef Func){
+  Function* F = unwrap<Function>(Func);
+  LLVMContext& C = F->getContext();
+  MDNode *N = MDNode::get(C, MDString::get(C, "Is extern function"));
+  F->addMetadata("ExternFunc", *N);
+}
+
 void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca) {
   LLVMContext &C = unwrap<Instruction>(Alloca)->getContext();
   MDNode *N = MDNode::get(C, MDString::get(C, "Is smart pointer alloca"));

@@ -2468,6 +2468,10 @@ void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn);
  * @brief Mark exchange_malloc call
 */
 void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId);
+/**
+ * @brief Mark external functions for Rust
+*/
+void LLVMRustMarkExternFunc(LLVMValueRef Func);
 
 /**
  * Check whether the given function has a personality function.

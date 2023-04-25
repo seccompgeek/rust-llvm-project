@@ -20,6 +20,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
 
     std::map<Instruction*, size_t> candidateCallSites;
+    std::set<Instruction*> externFuncCalls;
     Instruction* getTDISlotInsertPoint = nullptr;
     bool Allocas = true;
     for(auto &BB: Func){
@@ -44,6 +45,10 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
               }
               candidateCallSites.insert(std::make_pair(&Inst, TDIIndex));
             }
+          }else if(auto F = call->getCalledFunction()){
+            if(F->getMetadata("ExternFunc")){
+              externFuncCalls.insert(call);
+            }
           }
         }
       }
@@ -62,7 +67,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         Builder.SetInsertPoint(it.first);
         auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), it.second, false);
         Builder.CreateStore(Index, TDISlot, true);
-        if(auto callInst = dyn_cast<CallInst>(it.first)){
+        /*if(auto callInst = dyn_cast<CallInst>(it.first)){
           Builder.SetInsertPoint(it.first->getNextNode());
           Builder.CreateStore(ResetValue, TDISlot, false);
         }else{
@@ -76,7 +81,13 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
           }
           Builder.SetInsertPoint(nextInsertPoint);
           Builder.CreateStore(ResetValue, TDISlot, false);
-        }
+        }*/
+      }
+
+      for(auto it: externFuncCalls){
+        Builder.SetInsertPoint(it);
+        auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);
+        Builder.CreateStore(Index, TDISlot, true);
       }
     }
   }
