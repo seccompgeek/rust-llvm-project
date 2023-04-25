@@ -530,7 +530,11 @@ const uint32_t *X86RegisterInfo::getDarwinTLSCallPreservedMask() const {
 
 BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
-  const X86FrameLowering *TFI = getFrameLowering(MF);
+  const X86FrameLowering *TFI = getFrameLowering(MF); 
+
+  
+  for (const MCPhysReg &SubReg : subregs_inclusive(X86::R15))
+    Reserved.set(SubReg);
 
   // Set the floating point control register as reserved.
   Reserved.set(X86::FPCW);
