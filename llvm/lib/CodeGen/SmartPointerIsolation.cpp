@@ -1,5 +1,7 @@
-#include "/root/rust/src/llvm-project/llvm/lib/CodeGen/SafeStackLayout.h"
-
+#include "SafeStackLayout.h"
+#include "llvm/CodeGen/SmartPointerIsolation.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/CodeGen/Passes.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/BasicBlock.h"
@@ -237,7 +239,7 @@ public:
 	static char ID;
 	RustSmartPointerIsolationPass() : FunctionPass(ID)
 	{
-		//initializeRutsMetaIsolationPass(*PassRegistry::getPassRegistry());
+		initializeRustSmartPointerIsolationPassPass(*PassRegistry::getPassRegistry());
 	}
 
 	void getAnalysisUsage(AnalysisUsage &AU) const override
@@ -360,5 +362,15 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 }
 
 char RustSmartPointerIsolationPass::ID = 0;
-static RegisterPass<RustSmartPointerIsolationPass> X("rust-smart-pointer-isolation", "Rust Smart Pointer Isolation Pass");
+INITIALIZE_PASS(RustSmartPointerIsolationPass, "rust-smart-pointer-isolation", "Rust Smart Pointer Isolation Pass", false, false)
+
+FunctionPass *llvm::createRustSmartPointerIsolationPass() {
+  return new RustSmartPointerIsolationPass();
+}
+
+PreservedAnalyses RSPIPass::run(Function &F, FunctionAnalysisManager &AM) {
+  return PreservedAnalyses::all();
+}
+
+//static RegisterPass<RustSmartPointerIsolationPass> X("rust-smart-pointer-isolation", "Rust Smart Pointer Isolation Pass");
 
