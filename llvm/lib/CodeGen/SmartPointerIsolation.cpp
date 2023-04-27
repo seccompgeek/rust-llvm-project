@@ -264,9 +264,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 	if (!DL) report_fatal_error("Data Layout is required");
 	externStack = new ExternStack(F, *DL);
 
-	SmallVector<AllocaInst *, 4> StaticArrayAllocas;
-	SmallVector<AllocaInst *, 4> DynamicArrayAllocas;
-	SmallVector<Instruction *, 8> StackRestorePoints;
+	SmallVector<AllocaInst *, 4> StaticArrayAllocas;	
 	SmallVector<ReturnInst *, 4> Returns;
 	
 	bool foundMovable = false;
@@ -308,13 +306,13 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 			{
 				if (CI->getCalledFunction() && CI->canReturnTwice())
 				{
-					StackRestorePoints.push_back(CI);
+					//StackRestorePoints.push_back(CI);
 				}
 			}
 
 			else if (auto LPI = dyn_cast<LandingPadInst>(&I))
 			{
-				StackRestorePoints.push_back(LPI);
+				//StackRestorePoints.push_back(LPI);
 			}
 
 			else if (auto AI = dyn_cast<AllocaInst>(&I))
@@ -365,11 +363,12 @@ char RustSmartPointerIsolationPass::ID = 0;
 INITIALIZE_PASS(RustSmartPointerIsolationPass, "rust-smart-pointer-isolation", "Rust Smart Pointer Isolation Pass", false, false)
 
 FunctionPass *llvm::createRustSmartPointerIsolationPass() {
-  return new RustSmartPointerIsolationPass();
+	return new RustSmartPointerIsolationPass();
 }
 
 PreservedAnalyses RSPIPass::run(Function &F, FunctionAnalysisManager &AM) {
-  return PreservedAnalyses::all();
+	createRustSmartPointerIsolationPass()->runOnFunction(F);
+	return PreservedAnalyses::all();
 }
 
 //static RegisterPass<RustSmartPointerIsolationPass> X("rust-smart-pointer-isolation", "Rust Smart Pointer Isolation Pass");
