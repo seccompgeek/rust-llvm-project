@@ -197,7 +197,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<ReturnInst 
 	std::vector<Type *> arg_type;
 	std::vector<Value *> args;
 	LLVMContext &C = F.getContext();
-	Type* voidType = Type::getInt8PtrTy(F.getContext());
+	Type* voidPtrType = Type::getInt8PtrTy(F.getContext());
 
 
 	FunctionCallee Fn = F.getParent()->getOrInsertFunction(GET_EXTERN_STACK_PTR, StackPtrTy);
@@ -213,7 +213,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<ReturnInst 
 		moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr);
 	
 	IRB.SetInsertPoint(cast<Instruction>(StaticTop)->getNextNode());
-	FunctionCallee Fn_StackTop = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidType);
+	FunctionCallee Fn_StackTop = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidPtrType);
 	args.push_back(StaticTop);
 	IRB.CreateCall(Fn_StackTop, args);
 	
@@ -221,7 +221,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<ReturnInst 
 	{
 		IRB.SetInsertPoint(RI);
 		IRB.CreateStore(BasePtr, ExternStackPtr);
-		FunctionCallee Fn_Restore = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidType);
+		FunctionCallee Fn_Restore = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidPtrType);
 		args.clear();
 		args.push_back(BasePtr);
 		IRB.CreateCall(Fn_Restore, args);
@@ -354,6 +354,8 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 
 	if (foundMovable)
 	{
+		std::reverse(StaticArrayAllocas.begin(), StaticArrayAllocas.end());
+		std::reverse(Returns.begin(), Returns.end());
 		externStack->run(StaticArrayAllocas, Returns);
 	}
 	return foundMovable;
