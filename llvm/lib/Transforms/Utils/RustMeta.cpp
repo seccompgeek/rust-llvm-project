@@ -16,9 +16,61 @@ std::string MetaUpdateSMAPIPass::typeToString(Type* type){
 
 PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
                                                ModuleAnalysisManager &AM) {
+
+  /*Find special types housed in normal structs and insert new structs to replace them*/
+  auto structTypes = M.getIdentifiedStructTypes();
+  auto specialTypeMetadata = M.getNamedMetadata("SpecialTypes");
+  std::map<StructType*, StructType*> specialTypeHousedStructsMap;
+  std::map<StructType*, std::map<int, int>> specialTypeFieldRemap;
+  std::set<StructType*> specialTypes;
+  for(auto MDIt: specialTypeMetadata->operands()){
+    auto MDValue = cast<MDString>(MDIt)->getString();
+    for(auto type: structTypes){
+      if (type->getStructName().equals(MDValue)){
+        specialTypes.insert(type);
+      }
+    }
+  }
+
+  for(auto type: structTypes){
+    if (specialTypes.find(type) == specialTypes.end()){
+      auto totalFields = type->getStructNumElements();
+      SmallVector<Type*> specialFields;
+      SmallVector<int> FieldIndices;
+      for(int i=0; i<totalFields; i++){
+        auto fieldType = type->getStructElementType(i);
+        if(auto structFieldType = dyn_cast<StructType>(fieldType)){
+          if(specialTypes.find(structFieldType) != specialTypes.end()){
+            specialFields.push_back(fieldType);
+            FieldIndices.push_back(i);
+          }
+        }
+      }
+
+      if(specialFields.size() != 0){//TODO: if all fields are special, make this a special type as well as an optimization
+        StructType* newType = StructType::create(specialFields);
+        newType->setName(type->getStructName().str()+".safe");
+        specialTypeHousedStructsMap.insert(std::make_pair(type, newType));
+        specialTypeFieldRemap.insert(std::make_pair(type, std::map<int, int>()));
+        int counter = 0;
+        for(auto i: FieldIndices){
+          specialTypeFieldRemap[type].insert(std::make_pair(i, counter++));
+        }
+      }
+    }
+  }
+
+  //find uses of special fields in normal structs and replace them with the new types we've created
+  // for(auto &Func: M){
+  //   for(auto &Inst: Func){
+  //     if(auto gep = dyn_cast<GetElementPtrInst>(&Inst)){
+
+  //     }
+  //   }
+  // }
+
   for (auto &Func: M){
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
-
     std::map<Instruction*, size_t> candidateCallSites;
     std::set<Instruction*> externFuncCalls;
     Instruction* getTDISlotInsertPoint = nullptr;
