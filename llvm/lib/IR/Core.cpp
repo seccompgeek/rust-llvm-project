@@ -906,6 +906,13 @@ void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn){
   F->addMetadata("ExchangeMallocFunc", *N);
 }
 
+void LLVMRustMarkSpecialType(LLVMTypeRef Type_){
+  auto type = unwrap(Type_);
+  LLVMContext &C = type->getContext();
+  MDNode *N = MDNode::get(C, MDString::get(C, "Smart pointer type"));
+  type->setMetadata("SmartPointer", N);
+}
+
 void LLVMDumpValue(LLVMValueRef Val) {
   unwrap(Val)->print(errs(), /*IsForDebug=*/true);
 }
