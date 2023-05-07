@@ -60,6 +60,28 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     }
   }
 
+  /*auto checkIsZeroIdxGep = [&specialTypeFieldRemap](Type* type) {
+    if(auto structType = dyn_cast<StructType>(type)){
+      return specialTypeFieldRemap.find(structType) != specialTypeFieldRemap.end() && specialTypeFieldRemap[structType].find(0) != specialTypeFieldRemap[structType].end();
+    }else {
+      return false;
+    }
+  };
+
+  for (auto &Func: M){
+    if (Func.isDeclaration()) continue;
+    std::map<Instruction*, Instruction*> housingPtrToSafePtrMap;
+    for(auto &Inst: Func) {
+      if(auto loadInst = dyn_cast<LoadInst>(&Inst)){
+
+      }else if(auto allocaInst = dyn_cast<AllocaInst>(&Inst)){
+
+      }else if(auto gepInst = dyn_cast<GetElementPtrInst>(&Inst)){
+
+      }
+    }
+  }*/
+
   for (auto &Func: M){
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
     std::map<Instruction*, size_t> candidateCallSites;
