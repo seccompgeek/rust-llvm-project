@@ -879,6 +879,13 @@ void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId){
   call->setMetadata("ExchangeMallocCall", N);
 }
 
+void LLVMMarkFieldProjection(LLVMValueRef Inst, size_t Idx){
+  auto Val = unwrap(Inst);
+  LLVMContext &C = Val->getContext();
+  MDNode* N = MDNode::get(C, MDString::get(C, std::to_string(Idx)));
+  Val->addMetadata("FieldProjection", *N);
+}
+
 void LLVMRustMarkExternFunc(LLVMValueRef Func){
   Function* F = unwrap<Function>(Func);
   LLVMContext& C = F->getContext();

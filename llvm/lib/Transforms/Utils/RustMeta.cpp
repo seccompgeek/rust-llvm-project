@@ -60,15 +60,6 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     }
   }
 
-  //find uses of special fields in normal structs and replace them with the new types we've created
-  // for(auto &Func: M){
-  //   for(auto &Inst: Func){
-  //     if(auto gep = dyn_cast<GetElementPtrInst>(&Inst)){
-
-  //     }
-  //   }
-  // }
-
   for (auto &Func: M){
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
     std::map<Instruction*, size_t> candidateCallSites;

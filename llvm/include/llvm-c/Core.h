@@ -2476,7 +2476,10 @@ void LLVMRustMarkExternFunc(LLVMValueRef Func);
  * @brief mark special types for Rust
 */
 void LLVMRustMarkSpecialType(LLVMModuleRef Mod, LLVMTypeRef Typ);
-
+/**
+ * @brief mark field projection with index
+*/
+void LLVMMarkFieldProjection(LLVMValueRef Inst, size_t Idx);
 /**
  * Check whether the given function has a personality function.
  *
