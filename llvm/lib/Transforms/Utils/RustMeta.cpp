@@ -60,7 +60,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     }
   }
 
-  /*auto checkIsZeroIdxGep = [&specialTypeFieldRemap](Type* type) {
+  auto checkIsZeroIdxGep = [&specialTypeFieldRemap](Type* type) {
     if(auto structType = dyn_cast<StructType>(type)){
       return specialTypeFieldRemap.find(structType) != specialTypeFieldRemap.end() && specialTypeFieldRemap[structType].find(0) != specialTypeFieldRemap[structType].end();
     }else {
@@ -80,7 +80,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
 
       }
     }
-  }*/
+  }
 
   for (auto &Func: M){
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
