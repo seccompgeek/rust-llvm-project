@@ -886,6 +886,17 @@ void LLVMRustMarkExternFunc(LLVMValueRef Func){
   F->addMetadata("ExternFunc", *N);
 }
 
+void LLVMRustMarkSpecialType(LLVMModuleRef Mod, LLVMTypeRef Typ){
+  auto type = unwrap(Typ);
+  auto module = unwrap(Mod);
+  if (auto structType = dyn_cast<StructType>(type)){
+    auto structName = structType->getStructName();
+    MDNode* N = MDNode::get(type->getContext(), MDString::get(type->getContext(), structName));
+    auto specialTypesMD = module->getOrInsertNamedMetadata("SpecialTypes");
+    specialTypesMD->addOperand(N);
+  }
+}
+
 void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca) {
   LLVMContext &C = unwrap<Instruction>(Alloca)->getContext();
   MDNode *N = MDNode::get(C, MDString::get(C, "Is smart pointer alloca"));
