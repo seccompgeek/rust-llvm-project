@@ -533,7 +533,7 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   const X86FrameLowering *TFI = getFrameLowering(MF); 
 
   
-  for (const MCPhysReg &SubReg : subregs_inclusive(X86::R15))
+  for (const MCPhysReg &SubReg : subregs_inclusive(X86::GS))
     Reserved.set(SubReg);
 
   // Set the floating point control register as reserved.

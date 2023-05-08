@@ -200,7 +200,8 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<ReturnInst 
 	Type* voidPtrType = Type::getInt8PtrTy(F.getContext());
 
 
-	FunctionCallee Fn = F.getParent()->getOrInsertFunction(GET_EXTERN_STACK_PTR, StackPtrTy);
+	//FunctionCallee Fn = F.getParent()->getOrInsertFunction(GET_EXTERN_STACK_PTR, StackPtrTy);
+	FunctionCallee Fn = F.getParent()->getOrInsertFunction("GS2MEM", StackPtrTy);
 	Value* ExternStakcPointer= IRB.CreateCall(Fn);
 	Type *int8Ptr = Type::getInt8PtrTy(C);
 	this->ExternStackPtr = IRB.CreateAlloca(int8Ptr);
@@ -213,7 +214,8 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<ReturnInst 
 		moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr);
 	
 	IRB.SetInsertPoint(cast<Instruction>(StaticTop)->getNextNode());
-	FunctionCallee Fn_StackTop = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidPtrType);
+	//FunctionCallee Fn_StackTop = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidPtrType);
+	FunctionCallee Fn_StackTop = F.getParent()->getOrInsertFunction("MEM2GS", Type::getVoidTy(F.getContext()), StackPtrTy);
 	args.push_back(StaticTop);
 	IRB.CreateCall(Fn_StackTop, args);
 	
@@ -221,7 +223,8 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<ReturnInst 
 	{
 		IRB.SetInsertPoint(RI);
 		IRB.CreateStore(BasePtr, ExternStackPtr);
-		FunctionCallee Fn_Restore = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidPtrType);
+		//FunctionCallee Fn_Restore = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidPtrType);
+		FunctionCallee Fn_Restore =	F.getParent()->getOrInsertFunction("MEM2GS", Type::getVoidTy(F.getContext()), StackPtrTy);
 		args.clear();
 		args.push_back(BasePtr);
 		IRB.CreateCall(Fn_Restore, args);
@@ -275,13 +278,11 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		IRBuilder<> IRB(inst);
 		Type *StackPtrTy = Type::getInt8PtrTy(F.getContext());
 
-		/*FunctionCallee Fn = F.getParent()->getOrInsertFunction(
-			GET_DOMAIN_FUNC_NAME, StackPtrTy->getPointerTo(0));*/
 		FunctionCallee Fn = F.getParent()->getOrInsertFunction(
 			GET_EXTERN_STACK_PTR, StackPtrTy);
 		Value *ExternStackPtr = IRB.CreateCall(Fn);
 
-		std::vector<Type *> arg_type;
+		/*std::vector<Type *> arg_type;
 		std::vector<Value *> args;
 		LLVMContext &C = F.getContext();
 		MDNode *N = MDNode::get(C, {MDString::get(C, "r15")});
@@ -294,7 +295,15 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		args.push_back(MetadataAsValue::get(C, N));
 		args.push_back(ptrToIntInst);
 
-		IRB.CreateCall(writeRegisterFunc, args);
+		IRB.CreateCall(writeRegisterFunc, args);*/
+
+
+		FunctionCallee MEM2GS = F.getParent()->getOrInsertFunction(
+			"MEM2GS", Type::getVoidTy(F.getContext()), StackPtrTy);
+		std::vector<Value *> args;
+		args.push_back(ExternStackPtr);
+		IRB.CreateCall(MEM2GS, args);	
+
 		return true;
 	}
 
