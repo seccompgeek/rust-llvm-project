@@ -72,12 +72,10 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     if (Func.isDeclaration()) continue;
     std::map<Instruction*, Instruction*> housingPtrToSafePtrMap;
     for(auto &Inst: Func) {
-      if(auto loadInst = dyn_cast<LoadInst>(&Inst)){
-
-      }else if(auto allocaInst = dyn_cast<AllocaInst>(&Inst)){
-
-      }else if(auto gepInst = dyn_cast<GetElementPtrInst>(&Inst)){
-
+      if(auto memInst = dyn_cast<MemTransferInst>(&Inst)){
+        auto source = memInst->getSource();
+        auto dest = memInst->getDest();
+        auto len = memInst->getLength();
       }
     }
   }
