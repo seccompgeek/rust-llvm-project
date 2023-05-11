@@ -910,6 +910,12 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca) {
   unwrap<Instruction>(Alloca)->setMetadata("RustMeta-Smart-Pointer", N);
 }
 
+void LLVMSetSmartPointerHouseMetadata(LLVMValueRef Alloca){
+  LLVMContext &C = unwrap<Instruction>(Alloca)->getContext();
+  MDNode* N = MDNode::get(C, MDString::get(C, "Houses a smart pointer"));
+  unwrap<Instruction>(Alloca)->setMetadata("RustMeta-Smart-Pointer-House");
+}
+
 void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, unsigned long long TypeId){
   Function* F = unwrap<Function>(Fn);
   LLVMContext &C = F->getContext();
