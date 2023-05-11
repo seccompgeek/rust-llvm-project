@@ -11,6 +11,6 @@ namespace llvm {
 		public:
  			PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 	};
-}
+} // end namespace llvm
 
 #endif 
