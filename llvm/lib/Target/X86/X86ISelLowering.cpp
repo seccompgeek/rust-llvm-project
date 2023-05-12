@@ -28224,6 +28224,7 @@ Register X86TargetLowering::getRegisterByName(const char* RegName, LLT VT,
                        .Case("rsp", X86::RSP)
                        .Case("ebp", X86::EBP)
                        .Case("rbp", X86::RBP)
+                       .Case("gs", X86::GS)
                        .Default(0);
 
   if (Reg == X86::EBP || Reg == X86::RBP) {

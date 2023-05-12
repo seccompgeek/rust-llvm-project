@@ -562,6 +562,8 @@ namespace llvm {
 
   /// This pass converts conditional moves to conditional jumps when profitable.
   FunctionPass *createSelectOptimizePass();
+
+  FunctionPass *createRustSmartPointerIsolationPass();
 } // End llvm namespace
 
 #endif
