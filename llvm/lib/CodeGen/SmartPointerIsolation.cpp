@@ -503,7 +503,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 					}
 
 				}
-				else if (AI->hasMetadata("SmartPointer"))
+				else if (AI->hasMetadata("RustMeta-Smart-Pointer-House"))
 				{
 					if (AI->isStaticAlloca())
 					{
