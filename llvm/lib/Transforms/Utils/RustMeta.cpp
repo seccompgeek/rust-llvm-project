@@ -119,8 +119,9 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
 
     if(candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
       auto &Context = M.getContext();
-      auto TDISlot = new GlobalVariable(M, Type::getInt64Ty(Context), false, GlobalVariable::ExternalLinkage,
-                 nullptr, "_mi_tdi_index",nullptr,GlobalVariable::ThreadLocalMode::GeneralDynamicTLSModel,0U,true);
+      Constant* TDISlot = M.getOrInsertGlobal("_mi_tdi_index",Type::getInt64Ty(Context));
+      //auto TDISlot = new GlobalVariable(M, Type::getInt64Ty(Context), false, GlobalVariable::ExternalLinkage,
+      //           nullptr, "_mi_tdi_index",nullptr,GlobalVariable::ThreadLocalMode::GeneralDynamicTLSModel,0U,true);
       //auto getTDISlotCallee = M.getOrInsertFunction("mi_get_tdi_index_slot", FunctionType::get(Type::getVoidTy(Context)->getPointerTo(0), false));
       IRBuilder<> Builder(getTDISlotInsertPoint);
       //auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
