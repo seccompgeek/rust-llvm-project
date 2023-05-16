@@ -49,7 +49,7 @@ namespace
 
 		enum
 		{
-			StackAlignment = 16
+			StackAlignment = 8
 		};
 		
 		uint64_t getStaticAllocaAllocationSize(AllocaInst *AI);
