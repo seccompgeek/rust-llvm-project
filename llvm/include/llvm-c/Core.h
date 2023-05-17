@@ -2485,7 +2485,7 @@ void LLVMRustMarkSpecialType(LLVMModuleRef Mod, LLVMTypeRef Typ);
 /**
  * @brief mark field projection with index
 */
-void LLVMMarkFieldProjection(LLVMValueRef Inst, size_t Idx);
+void LLVMMarkFieldProjection(LLVMValueRef Inst, unsigned long long Idx);
 /**
  * Check whether the given function has a personality function.
  *

@@ -923,7 +923,7 @@ void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, unsigned long long TypeId){
   F->addMetadata("SmartPointerAPIFunc", *N);
 }
 
-void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, size_t Indx){
+void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   Instruction* inst = unwrap<Instruction>(TDIIndexPlace);
   auto &context = inst->getContext();
   IRBuilder<> Builder(inst);
