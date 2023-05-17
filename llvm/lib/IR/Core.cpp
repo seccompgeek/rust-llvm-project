@@ -923,6 +923,18 @@ void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, unsigned long long TypeId){
   F->addMetadata("SmartPointerAPIFunc", *N);
 }
 
+void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, size_t Indx){
+  Instruction* inst = unwrap<Instruction>(TDIIndexPlace);
+  auto &context = inst->getContext();
+  IRBuilder<> Builder(inst);
+  Builder.SetInsertPoint(inst);
+  auto Index = ConstantInt::get(IntegerType::getInt64Ty(context), Indx, false);
+  Module* module = inst->getParent()->getParent()->getParent();
+  auto TDISlot = cast<GlobalVariable>(module->getOrInsertGlobal("_mi_tdi_index", Type::getInt64Ty(context)));
+  TDISlot->setThreadLocal(true);
+  Builder.CreateStore(Index, TDISlot, true);
+}
+
 void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn){
   Function* F = unwrap<Function>(Fn);
   LLVMContext &C = F->getContext();
