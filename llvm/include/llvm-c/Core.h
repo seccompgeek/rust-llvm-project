@@ -2458,7 +2458,7 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca);
 /**
  * @brief store a value in the TDI index
 */
-void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, size_t Indx);
+void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx);
 
 void LLVMSetSmartPointerHouseMetadata(LLVMValueRef Alloca);
 /**
@@ -2485,7 +2485,7 @@ void LLVMRustMarkSpecialType(LLVMModuleRef Mod, LLVMTypeRef Typ);
 /**
  * @brief mark field projection with index
 */
-void LLVMMarkFieldProjection(LLVMValueRef Inst, unsigned long long Idx);
+void LLVMMarkFieldProjection(LLVMValueRef Inst, size_t Idx);
 /**
  * Check whether the given function has a personality function.
  *
