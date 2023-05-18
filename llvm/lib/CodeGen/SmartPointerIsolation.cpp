@@ -143,7 +143,7 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 
 	for (AllocaInst *AI : StaticAllocas)
 	{
-		errs() << *AI << "\n";
+		//errs() << *AI << "\n";
 		IRB.SetInsertPoint(AI);
 		unsigned Offset = SSL.getObjectOffset(AI);
 
@@ -255,7 +255,7 @@ Value *ExternStack::moveHousedSmartPtrsToExternStack(
 
 	for (AllocaInst *AI : HousedSmartPointers)
 	{
-		errs() << *AI << "\n";
+		//errs() << *AI << "\n";
 		IRB.SetInsertPoint(AI);
 		unsigned Offset = SSL.getObjectOffset(AI);
 
