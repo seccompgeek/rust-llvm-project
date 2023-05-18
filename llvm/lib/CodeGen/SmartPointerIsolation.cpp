@@ -14,13 +14,6 @@
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/PassRegistry.h"
-//#include "llvm/Support/CommandLine.h"
-//#include "llvm/Support/Compiler.h"
-//#include "llvm/Support/ErrorHandling.h"
-//#include "llvm/Support/TypeSize.h"
-//#include "llvm/IR/OptBisect.h"
-//#include "llvm/ADT/Optional.h"
-//#include "llvm/PassManager.h"
 #include "llvm/PassRegistry.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/InlineAsm.h"
@@ -30,7 +23,7 @@
 #include <vector>
 
 #define DEBUG_TYPE "rust-meta"
-#define GET_EXTERN_STACK_PTR "__get_extern_stack_ptr"
+
 
 using namespace llvm;
 
