@@ -341,33 +341,41 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<AllocaInst 
 	this->ExternStackPtr =
     	IRB.CreateBitCast(ExternStackPointer, StackPtrTy->getPointerTo(0));
 	
+	Instruction *BasePtr;
+	Value *PureTop;
 
+	if(!StaticAllocas.empty()){
+		BasePtr = IRB.CreateLoad(StackPtrTy, ExternStackPtr, false, "extern_stack_ptr_pure");
 
-	Instruction *BasePtr =
-    	IRB.CreateLoad(StackPtrTy, ExternStackPtr, false, "extern_stack_ptr_pure");
-
-	Value *PureTop =
-		moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr);
+		PureTop = moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr);
 	
-	IRB.SetInsertPoint(cast<Instruction>(PureTop)->getNextNode());
-	IRB.CreateStore(PureTop, ExternStackPtr);
+		IRB.SetInsertPoint(cast<Instruction>(PureTop)->getNextNode());
+		IRB.CreateStore(PureTop, ExternStackPtr);
+	}
 
+	Instruction *temp;
+	Instruction *HousedBasePtr;
+	Value *HousedTop;	
 
-	Instruction *temp = cast<Instruction>(IRB2.CreateGEP(Type::getInt8Ty(C), ExternStackPtr, ConstantInt::get(Int32Ty, 8)));
-	Instruction *HousedBasePtr = IRB2.CreateLoad(StackPtrTy, temp, false, "extern_stack_ptr_housed"); 
+	if(!HousedSmartPointers.empty()){	
+		temp = cast<Instruction>(IRB2.CreateGEP(Type::getInt8Ty(C), ExternStackPtr, ConstantInt::get(Int32Ty, 8)));
+		HousedBasePtr = IRB2.CreateLoad(StackPtrTy, temp, false, "extern_stack_ptr_housed"); 
 
-	Value *HousedTop =
-		moveHousedSmartPtrsToExternStack(IRB2, F, HousedSmartPointers, HousedBasePtr);
+		HousedTop = moveHousedSmartPtrsToExternStack(IRB2, F, HousedSmartPointers, HousedBasePtr);
 
-	IRB2.SetInsertPoint(cast<Instruction>(HousedTop)->getNextNode());
-	IRB2.CreateStore(HousedTop, temp);
-	
-	
+		IRB2.SetInsertPoint(cast<Instruction>(HousedTop)->getNextNode());
+		IRB2.CreateStore(HousedTop, temp);
+	}	
+
 	for (ReturnInst *RI : Returns)
 	{
 		IRB.SetInsertPoint(RI);
-		IRB.CreateStore(BasePtr, ExternStackPtr);
-		IRB.CreateStore(HousedBasePtr, temp);
+		if(!StaticAllocas.empty()){
+			IRB.CreateStore(BasePtr, ExternStackPtr);
+		}
+		if(!HousedSmartPointers.empty()){
+			IRB.CreateStore(HousedBasePtr, temp);
+		}
 		//FunctionCallee Fn_Restore = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidPtrType);
 		/*FunctionCallee Fn_Restore =	F.getParent()->getOrInsertFunction("MEM2GS", Type::getVoidTy(F.getContext()), StackPtrTy);
 		args.clear();
