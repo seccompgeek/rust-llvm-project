@@ -95,7 +95,7 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 	if (StaticAllocas.empty())
 		return BasePtr;
 
-	errs() << "Moving static allocas\n";
+	// errs() << "Moving static allocas\n";
 	DIBuilder DIB(*F.getParent());
 
 	StackLifetime SSC(F, StaticAllocas, StackLifetime::LivenessType::May);
@@ -106,7 +106,6 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 		if (Op && Op->use_empty())
 			Op->eraseFromParent();
 	}
-	///
 
 	static const StackLifetime::LiveRange NoColoringRange(1, true);
 
@@ -118,7 +117,6 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 		u_int64_t Size = getStaticAllocaAllocationSize(AI);
 		assert(Size !=0 && "Size should be bigger than 0");
 		//if (Size == 0) Size = 1;
-
 
 		unsigned intAlign =
 			std::max((unsigned)DL.getPrefTypeAlignment(Ty), (unsigned)AI->getAlign().value());
@@ -150,26 +148,26 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 		unsigned Offset = SSL.getObjectOffset(AI);
 
 		// dbg
-		outs() << "move static alloca -- offset : " << Offset << "\n";
+		// outs() << "move static alloca -- offset : " << Offset << "\n";
 		//dgb
 
 		replaceDbgDeclare(AI, BasePtr, DIB, DIExpression::ApplyOffset, -Offset);
 		replaceDbgValueForAlloca(AI, BasePtr, DIB, -Offset);
 
-		int i = 0;
+		// int i = 0;
 		
 		std::string Name = std::string(AI->getName()) + ".rsp_extern";
 		while (!AI->use_empty())
 		{
-			i++;
+			// i++;
 
 			Use &U = *AI->use_begin();
 			Instruction *User = cast<Instruction>(U.getUser());
-			outs() << i << ". user : " << *User << "\n"; //dbg
+			// outs() << i << ". user : " << *User << "\n"; //dbg
 			
 			Instruction *InsertBefore;
 			if (auto *PHI = dyn_cast<PHINode>(User)){
-				outs() << "find Phi node\n"; //dbg
+				// outs() << "find Phi node\n"; //dbg
 				InsertBefore = PHI->getIncomingBlock(U)->getTerminator();
 				}
 			else
@@ -179,15 +177,15 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 			Value *Off = IRBUser.CreateGEP(Int8Ty, BasePtr,
 										   ConstantInt::get(Int32Ty, -Offset));
 			Value *Replacement = IRBUser.CreateBitCast(Off, AI->getType(), Name);
-			outs() << "   Replacement : " << *Replacement << "\n"; //dbg
+			// outs() << "   Replacement : " << *Replacement << "\n"; //dbg
 
 			if (auto *PHI = dyn_cast<PHINode>(User))
 				PHI->setIncomingValueForBlock(PHI->getIncomingBlock(U), Replacement);
 			else
 				U.set(Replacement); 
 			
-			Instruction *user2 = cast<Instruction>(U.getUser()); //dbg
-			outs() << "   user : " << *user2 << "\n\n";  //dbg
+			// Instruction *user2 = cast<Instruction>(U.getUser()); //dbg
+			// outs() << "   user : " << *user2 << "\n\n";  //dbg
 		}
 		AI->eraseFromParent();
 	}
@@ -197,9 +195,9 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 
 	Value *StaticTop =
 		IRB.CreateGEP(Int8Ty, BasePtr, ConstantInt::get(Int32Ty, -FrameSize),
-					  "extern_stack_top");
-	IRB.CreateStore(StaticTop, ExternStackPtr);
-	errs() << "Moved static allocas\n";
+					  "extern_stack_pure_top");
+	// IRB.CreateStore(StaticTop, ExternStackPtr);
+	// errs() << "Moved static allocas\n";
 	return StaticTop;
 }
 
@@ -210,10 +208,9 @@ Value *ExternStack::moveHousedSmartPtrsToExternStack(
 	if (HousedSmartPointers.empty())
 		return BasePtr;
 
-	errs() << "Moving static allocas\n";
+	//errs() << "Moving housed allocas\n";
 	DIBuilder DIB(*F.getParent());
 
-	// I don't think this part is need
 	StackLifetime SSC(F, HousedSmartPointers, StackLifetime::LivenessType::May);
 	for (auto *I : SSC.getMarkers())
 	{
@@ -222,7 +219,6 @@ Value *ExternStack::moveHousedSmartPtrsToExternStack(
 		if (Op && Op->use_empty())
 			Op->eraseFromParent();
 	}
-	///
 
 	static const StackLifetime::LiveRange NoColoringRange(1, true);
 
@@ -257,8 +253,6 @@ Value *ExternStack::moveHousedSmartPtrsToExternStack(
 			StackPtrTy));
 	}
 
-	//IRB.SetInsertPoint(BasePtr->getNextNode());
-
 	for (AllocaInst *AI : HousedSmartPointers)
 	{
 		errs() << *AI << "\n";
@@ -266,39 +260,38 @@ Value *ExternStack::moveHousedSmartPtrsToExternStack(
 		unsigned Offset = SSL.getObjectOffset(AI);
 
 		// dbg
-		outs() << "move housed smart pointer -- offset : " << Offset << "\n";
-		//dgb
+		// outs() << "move housed smart pointer -- offset : " << Offset << "\n";
+		// dgb
 
 		replaceDbgDeclare(AI, BasePtr, DIB, DIExpression::ApplyOffset, -Offset);
 		replaceDbgValueForAlloca(AI, BasePtr, DIB, -Offset);
 
-		int i = 0;
+		//int i = 0;
 		
 		std::string Name = std::string(AI->getName()) + ".rsp_extern";
 		while (!AI->use_empty())
 		{
-			i++;
+			//i++;
 
 			Use &U = *AI->use_begin();
 			Instruction *User = cast<Instruction>(U.getUser());
-			outs() << i << ". user : " << *User << "\n"; //dbg
+			// outs() << i << ". user : " << *User << "\n"; //dbg
 			
 			Instruction *InsertBefore;
 			if (auto *PHI = dyn_cast<PHINode>(User)){
-				outs() << "find Phi node\n"; //dbg
+				// outs() << "find Phi node\n"; //dbg
 				InsertBefore = PHI->getIncomingBlock(U)->getTerminator();
 				}
 			else
 				InsertBefore = User;
 
 			// WARNNING : need to one more see!!!
-			// this part means that before every user, insert gep instruction to get the extern SP, 
-			// but I think this may generate overhead
+			// this part means that before every user, insert gep instruction to get the extern SP
 			IRBuilder<> IRBUser(InsertBefore);
 			Value *Off = IRBUser.CreateGEP(Int8Ty, BasePtr,
 										   ConstantInt::get(Int32Ty, -Offset));
 			Value *Replacement = IRBUser.CreateBitCast(Off, AI->getType(), Name);
-			outs() << "   Replacement : " << *Replacement << "\n"; //dbg
+			// outs() << "   Replacement : " << *Replacement << "\n"; //dbg
 
 			// TODO : need one more see!!!!
 			// a little confused
@@ -307,8 +300,8 @@ Value *ExternStack::moveHousedSmartPtrsToExternStack(
 			else
 				U.set(Replacement); 
 			
-			Instruction *user2 = cast<Instruction>(U.getUser()); //dbg
-			outs() << "   user : " << *user2 << "\n\n";  //dbg
+			//Instruction *user2 = cast<Instruction>(U.getUser()); //dbg
+			//outs() << "   user : " << *user2 << "\n\n";  //dbg
 		}
 		AI->eraseFromParent();
 	}
@@ -318,9 +311,9 @@ Value *ExternStack::moveHousedSmartPtrsToExternStack(
 
 	Value *StaticTop =
 		IRB.CreateGEP(Int8Ty, BasePtr, ConstantInt::get(Int32Ty, -FrameSize),
-					  "extern_stack_top");
-	IRB.CreateStore(StaticTop, ExternStackPtr); // This part doesn't need when using static alloca isolation only.
-	errs() << "Moved static allocas\n";
+					  "extern_stack_housed_top");
+	// IRB.CreateStore(StaticTop, ExternStackPtr);
+	// errs() << "Moved static allocas\n";
 	return StaticTop;
 }
 
@@ -409,7 +402,7 @@ private:
 bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 {
 	if(F.isDeclaration()){
-		outs() << "this function is declaration\n";
+		// outs() << "this function is declaration\n";
 		return false;
 	}
 
