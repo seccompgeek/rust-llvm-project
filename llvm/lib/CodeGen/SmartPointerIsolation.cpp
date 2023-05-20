@@ -541,7 +541,11 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 					}
 
 				}
+<<<<<<< HEAD
 				else
+=======
+				else 
+>>>>>>> 8106fb55aeabf353a2bb1562c4298857052e2029
 				{
 					if (AI->isStaticAlloca())
 					{
