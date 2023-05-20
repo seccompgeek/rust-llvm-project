@@ -471,7 +471,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		
 		std::vector<Value *> args;
 
-		StringRef asmCode = "movq $0, \%fs:${1:c}";
+		StringRef asmCode = "movq $0, %fs:${1:c}";
 		StringRef constraints = "r,i,~{dirflag},~{fpsr},~{flags}";
 
 		InlineAsm* inlineAsm = InlineAsm::get(
@@ -541,11 +541,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 					}
 
 				}
-<<<<<<< HEAD
-				else
-=======
-				else 
->>>>>>> 8106fb55aeabf353a2bb1562c4298857052e2029
+				else if (AI->hasMetadata("RustMeta-Smart-Pointer-House"))
 				{
 					if (AI->isStaticAlloca())
 					{
@@ -558,7 +554,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 						}
 					}
 					else{
-						//assert(AI->isStaticAlloca() && "Dynamic Alloca inst is not yet implemented");
+						assert(AI->isStaticAlloca() && "Dynamic Alloca inst is not yet implemented");
 					}
 				}
 			}
