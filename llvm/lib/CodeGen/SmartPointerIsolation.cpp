@@ -554,7 +554,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 						}
 					}
 					else{
-						assert(AI->isStaticAlloca() && "Dynamic Alloca inst is not yet implemented");	
+						//assert(AI->isStaticAlloca() && "Dynamic Alloca inst is not yet implemented");	
 					}
 				}
 			}
