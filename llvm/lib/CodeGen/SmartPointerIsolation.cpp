@@ -14,22 +14,16 @@
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/PassRegistry.h"
-//#include "llvm/Support/CommandLine.h"
-//#include "llvm/Support/Compiler.h"
-//#include "llvm/Support/ErrorHandling.h"
-//#include "llvm/Support/TypeSize.h"
-//#include "llvm/IR/OptBisect.h"
-//#include "llvm/ADT/Optional.h"
-//#include "llvm/PassManager.h"
 #include "llvm/PassRegistry.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/IR/InlineAsm.h"
 
 #include <cassert>
 #include <string>
 #include <vector>
 
 #define DEBUG_TYPE "rust-meta"
-#define GET_EXTERN_STACK_PTR "__get_extern_stack_ptr"
+
 
 using namespace llvm;
 
@@ -330,11 +324,31 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<AllocaInst 
 	}
 	
 	LLVMContext &C = F.getContext();
-	Type* voidPtrType = Type::getInt8PtrTy(F.getContext());
 
-	//FunctionCallee Fn = F.getParent()->getOrInsertFunction(GET_EXTERN_STACK_PTR, StackPtrTy);
-	FunctionCallee Fn = F.getParent()->getOrInsertFunction("FS2MEM", StackPtrTy);
-	Value* ExternStackPointer= IRB.CreateCall(Fn);
+///
+	std::vector<Value *> args;
+
+	StringRef asmCode = "movq %fs:${1:c}, $0";
+	StringRef constraints = "=r,i,~{dirflag},~{fpsr},~{flags}";
+
+	InlineAsm* inlineAsm = InlineAsm::get(
+       	FunctionType::get(Type::getInt64Ty(C), {Type::getInt32Ty(C)}, false),
+       	asmCode, constraints, false, false, InlineAsm::AD_ATT);
+
+	//args.push_back(ptrToIntInst);
+	args.push_back(ConstantInt::get(Type::getInt32Ty(C), 56));
+		
+	CallInst *FS2MEM = IRB.CreateCall(inlineAsm, args);
+	FS2MEM->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);
+	
+	// WARNNING 
+	FS2MEM->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::ReadNone);
+	// WARNNING 
+
+	Value *ExternStackPointer = IRB.CreateIntToPtr(FS2MEM, Type::getInt64PtrTy(C));
+	//FunctionCallee Fn = F.getParent()->getOrInsertFunction("FS2MEM", StackPtrTy);
+	//Value* ExternStackPointer= IRB.CreateCall(Fn);
+///
 
 	Type *int64Ptr = Type::getInt64PtrTy(C);
 	ExternStackPointer = IRB.CreateBitCast(ExternStackPointer, int64Ptr->getPointerTo(0));
@@ -416,6 +430,8 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		return false;
 	}
 
+	LLVMContext &C = F.getContext();
+
 	auto *DL = &F.getParent()->getDataLayout();
 	if (!DL) report_fatal_error("Data Layout is required");
 	externStack = new ExternStack(F, *DL);
@@ -430,7 +446,9 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		auto II = F.begin()->begin();
 		Instruction *inst = &(*II);
 		IRBuilder<> IRB(inst);
-		Type *StackPtrTy = Type::getInt8PtrTy(F.getContext());
+		Type *StackPtrTy = Type::getInt8PtrTy(C);
+		Type *int64Ty = Type::getInt64Ty(C);
+		Type *int32Ty = Type::getInt32Ty(C);
 
 		FunctionCallee Fn = F.getParent()->getOrInsertFunction(
 			"__get_wrapper", StackPtrTy);
@@ -450,14 +468,31 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		args.push_back(ptrToIntInst);
 
 		IRB.CreateCall(writeRegisterFunc, args);*/
+		
+		std::vector<Value *> args;
+
+		StringRef asmCode = "movq $0, %fs:${1:c}";
+		StringRef constraints = "r,i,~{dirflag},~{fpsr},~{flags}";
+
+		InlineAsm* inlineAsm = InlineAsm::get(
+        	FunctionType::get(Type::getVoidTy(C), {Type::getInt64Ty(C), Type::getInt32Ty(C)}, false),
+        	asmCode, constraints, true, false, InlineAsm::AD_ATT);
+
+		Value *ptrToIntInst = IRB.CreatePtrToInt(ExternStackPtr, int64Ty);
+		args.push_back(ptrToIntInst);
+		args.push_back(ConstantInt::get(int32Ty, 56));
+		
+
+		CallInst *MEM2FS = IRB.CreateCall(inlineAsm, args);
+		MEM2FS->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);
 
 
-		FunctionCallee MEM2GS = F.getParent()->getOrInsertFunction(
+		/*FunctionCallee MEM2GS = F.getParent()->getOrInsertFunction(
 			"MEM2FS", Type::getVoidTy(F.getContext()), StackPtrTy);
 		std::vector<Value *> args;
 		args.push_back(ExternStackPtr);
 		IRB.CreateCall(MEM2GS, args);	
-
+		*/
 		return true;
 	}
 
@@ -519,7 +554,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 						}
 					}
 					else{
-						assert(AI->isStaticAlloca() && "Dynamic Alloca inst is not yet implemented");	
+						assert(AI->isStaticAlloca() && "Dynamic Alloca inst is not yet implemented");
 					}
 				}
 			}
