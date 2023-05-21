@@ -39,7 +39,8 @@ namespace
 		Type *Int32Ty;
 		Type *Int8Ty;
 
-		Value *ExternStackPtr = nullptr; // extern stack pointer wrapper
+		Value *PureExternStackPtr = nullptr;
+		Value *HousedExternStackPtr = nullptr;
 
 		enum
 		{
@@ -57,17 +58,26 @@ namespace
 			  Int32Ty(Type::getInt32Ty(F.getContext())),
 			  Int8Ty(Type::getInt8Ty(F.getContext())) {}
 
-		Value *moveHousedSmartPtrsToExternStack(IRBuilder<> &IRB, Function &F, 
-												ArrayRef<AllocaInst *> HousedSmartPointers,
-												Instruction *BasePtr);	
-
+		
 		Value *moveStaticAllocasToExternStack(IRBuilder<> &IRB, Function &F,
 											  ArrayRef<AllocaInst *> StaticAllocas,
-											  Instruction *BasePtr);
+											  Instruction *BasePtr, Value *ExternStackPtr,
+											  bool isPure);
+		
+		void moveDynamicAllocasToExternStack(Function &F, Value *ExternStackPtr,
+											 AllocaInst *DynamicTop,
+											 ArrayRef<AllocaInst *> DynamicAllocas);
+		AllocaInst *
+		createStackRestorePoints(IRBuilder<> &IRB, Function &F,
+								 ArrayRef<Instruction *> StackRestorePoints,
+								 Value *StaticTop, Value *ExternStackPtr, bool NeedDynamicTop,
+								 bool isPure);
 
-		void run(ArrayRef<AllocaInst *> StaticAllocas, 
-				 ArrayRef<AllocaInst *> HousedSmaartPointers,
-				 ArrayRef<ReturnInst *> Returns);
+		void run(ArrayRef<AllocaInst *> StaticAllocas,
+				 ArrayRef<AllocaInst *> DynamicAllocas,
+				 ArrayRef<Instruction *> StackRestorePoints, 
+				 ArrayRef<ReturnInst *> Returns,
+				 bool isPure);
 	};
 } // namespace
 
@@ -81,10 +91,122 @@ uint64_t ExternStack::getStaticAllocaAllocationSize(AllocaInst *AI)
 	return Size;
 }
 
+void ExternStack::moveDynamicAllocasToExternStack(
+	Function &F, Value *ExternStackPtr, AllocaInst *DynamicTop,
+	ArrayRef<AllocaInst *> DynamicAllocas)
+{
+	//errs() << "Moving dynamic allocas\n";
+	DIBuilder DIB(*F.getParent());
+
+	for (AllocaInst *AI : DynamicAllocas)
+	{
+		//errs() << *AI << "\n";
+		IRBuilder<> IRB(AI);
+		Value *ArraySize = AI->getArraySize();
+		if (ArraySize->getType() != IntPtrTy)
+			ArraySize = IRB.CreateIntCast(ArraySize, IntPtrTy, false);
+
+		Type *Ty = AI->getAllocatedType();
+		u_int64_t TySize = DL.getTypeAllocSize(Ty);
+		Value *Size = IRB.CreateMul(ArraySize, ConstantInt::get(IntPtrTy, TySize));
+		Value *SP = IRB.CreatePtrToInt(IRB.CreateLoad(StackPtrTy, ExternStackPtr),
+									   IntPtrTy);
+		SP = IRB.CreateSub(SP, Size);
+
+		unsigned intAlign = std::max(
+			std::max((unsigned)DL.getPrefTypeAlignment(Ty), (unsigned)AI->getAlign().value()),
+			(unsigned)StackAlignment);
+
+		assert(isPowerOf2_32(intAlign));
+		Value *NewTop = IRB.CreateIntToPtr(
+			IRB.CreateAnd(SP, ConstantInt::get(IntPtrTy, ~u_int64_t(intAlign - 1))),
+			StackPtrTy);
+		IRB.CreateStore(NewTop, ExternStackPtr);
+		if (DynamicTop)
+			IRB.CreateStore(NewTop, DynamicTop);
+
+		Value *NewAI = IRB.CreatePointerCast(NewTop, AI->getType());
+		if (AI->hasName() && isa<Instruction>(NewAI))
+			NewAI->takeName(AI);
+
+		replaceDbgDeclare(AI, NewAI, DIB, DIExpression::ApplyOffset, 0);
+		AI->replaceAllUsesWith(NewAI);
+		AI->eraseFromParent();
+	}
+
+	if (!DynamicAllocas.empty())
+	{
+		for (inst_iterator It = inst_begin(&F), Ie = inst_end(&F); It != Ie;)
+		{
+			Instruction *I = &*(It++);
+			auto II = dyn_cast<IntrinsicInst>(I);
+			if (!II)
+				continue;
+
+			if (II->getIntrinsicID() == Intrinsic::stacksave)
+			{
+				IRBuilder<> IRB(II);
+				Instruction *LI = IRB.CreateLoad(StackPtrTy, ExternStackPtr);
+				LI->takeName(II);
+				II->replaceAllUsesWith(LI);
+				II->eraseFromParent();
+			}
+			else if (II->getIntrinsicID() == Intrinsic::stackrestore)
+			{
+				IRBuilder<> IRB(II);
+				Instruction *SI = IRB.CreateStore(II->getArgOperand(0), ExternStackPtr);
+				SI->takeName(II);
+				assert(II->use_empty());
+				II->eraseFromParent();
+			}
+		}
+	}
+	//errs() << "Moved dynamic allocas\n";
+}
+
+
+AllocaInst *ExternStack::createStackRestorePoints(
+	IRBuilder<> &IRB, Function &F, ArrayRef<Instruction *> StackRestorePoints,
+	Value *StaticTop, Value *ExternStackPtr, bool NeedDynamicTop, bool isPure)
+{
+	assert(StaticTop && "The stack top isn't set.");
+
+	if (StackRestorePoints.empty())
+		return nullptr;
+	
+	const char *name;
+	if(isPure){
+		name= "dynamic_pure_ptr";
+	}
+	else{
+		name = "dynamic_housed_ptr";
+	}
+
+	AllocaInst *DynamicTop = nullptr;
+	if (NeedDynamicTop)
+	{
+		DynamicTop = IRB.CreateAlloca(StackPtrTy, /*ArraySize=*/nullptr,
+									  name);
+		IRB.CreateStore(StaticTop, DynamicTop);
+	}
+
+	// Restore current stack pointer after longjmp/exception catch.
+	for (Instruction *I : StackRestorePoints)
+	{
+
+		IRB.SetInsertPoint(I->getNextNode());
+		Value *CurrentTop =
+			DynamicTop ? IRB.CreateLoad(StackPtrTy, DynamicTop) : StaticTop;
+		IRB.CreateStore(CurrentTop, ExternStackPtr);
+	}
+
+	return DynamicTop;
+}
+
 
 Value *ExternStack::moveStaticAllocasToExternStack(
 	IRBuilder<> &IRB, Function &F, ArrayRef<AllocaInst *> StaticAllocas,
-	Instruction *BasePtr)
+	Instruction *BasePtr, Value *ExternStackPtr, bool isPure)
 {
 	if (StaticAllocas.empty())
 		return BasePtr;
@@ -109,8 +231,8 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 	{
 		Type *Ty = AI->getAllocatedType();
 		u_int64_t Size = getStaticAllocaAllocationSize(AI);
-		assert(Size !=0 && "Size should be bigger than 0");
-		//if (Size == 0) Size = 1;
+		//assert(Size !=0 && "Size should be bigger than 0");
+		if (Size == 0) Size = 1;
 
 		unsigned intAlign =
 			std::max((unsigned)DL.getPrefTypeAlignment(Ty), (unsigned)AI->getAlign().value());
@@ -137,33 +259,22 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 
 	for (AllocaInst *AI : StaticAllocas)
 	{
-		//errs() << *AI << "\n";
 		IRB.SetInsertPoint(AI);
 		unsigned Offset = SSL.getObjectOffset(AI);
-
-		// dbg
-		// outs() << "move static alloca -- offset : " << Offset << "\n";
-		//dgb
 
 		replaceDbgDeclare(AI, BasePtr, DIB, DIExpression::ApplyOffset, -Offset);
 		replaceDbgValueForAlloca(AI, BasePtr, DIB, -Offset);
 
-		// int i = 0;
-		
 		std::string Name = std::string(AI->getName()) + ".rsp_extern";
 		while (!AI->use_empty())
 		{
-			// i++;
 
 			Use &U = *AI->use_begin();
 			Instruction *User = cast<Instruction>(U.getUser());
-			// outs() << i << ". user : " << *User << "\n"; //dbg
-			
+
 			Instruction *InsertBefore;
-			if (auto *PHI = dyn_cast<PHINode>(User)){
-				// outs() << "find Phi node\n"; //dbg
+			if (auto *PHI = dyn_cast<PHINode>(User))
 				InsertBefore = PHI->getIncomingBlock(U)->getTerminator();
-				}
 			else
 				InsertBefore = User;
 
@@ -171,235 +282,104 @@ Value *ExternStack::moveStaticAllocasToExternStack(
 			Value *Off = IRBUser.CreateGEP(Int8Ty, BasePtr,
 										   ConstantInt::get(Int32Ty, -Offset));
 			Value *Replacement = IRBUser.CreateBitCast(Off, AI->getType(), Name);
-			// outs() << "   Replacement : " << *Replacement << "\n"; //dbg
 
 			if (auto *PHI = dyn_cast<PHINode>(User))
 				PHI->setIncomingValueForBlock(PHI->getIncomingBlock(U), Replacement);
 			else
 				U.set(Replacement); 
-			
-			// Instruction *user2 = cast<Instruction>(U.getUser()); //dbg
-			// outs() << "   user : " << *user2 << "\n\n";  //dbg
 		}
 		AI->eraseFromParent();
 	}
-
 	unsigned FrameSize = alignTo(SSL.getFrameSize(), StackAlignment);
-	IRB.SetInsertPoint(BasePtr->getNextNode());
+	
+	const char *name;
+	if(isPure){
+		name= "extern_stack_pure_top";
+	}
+	else{
+		name = "extern_stack_housed_top";	
+	}
 
+	IRB.SetInsertPoint(BasePtr->getNextNode());
 	Value *StaticTop =
 		IRB.CreateGEP(Int8Ty, BasePtr, ConstantInt::get(Int32Ty, -FrameSize),
-					  "extern_stack_pure_top");
-	// IRB.CreateStore(StaticTop, ExternStackPtr);
+					  name);
+	IRB.CreateStore(StaticTop, ExternStackPtr);
 	// errs() << "Moved static allocas\n";
 	return StaticTop;
 }
 
-Value *ExternStack::moveHousedSmartPtrsToExternStack(
-	IRBuilder<> &IRB, Function &F, ArrayRef<AllocaInst *> HousedSmartPointers,
-	Instruction *BasePtr)
-{
-	if (HousedSmartPointers.empty())
-		return BasePtr;
-
-	//errs() << "Moving housed allocas\n";
-	DIBuilder DIB(*F.getParent());
-
-	StackLifetime SSC(F, HousedSmartPointers, StackLifetime::LivenessType::May);
-	for (auto *I : SSC.getMarkers())
-	{
-		auto *Op = dyn_cast<Instruction>(I->getOperand(1));
-		const_cast<IntrinsicInst *>(I)->eraseFromParent();
-		if (Op && Op->use_empty())
-			Op->eraseFromParent();
-	}
-
-	static const StackLifetime::LiveRange NoColoringRange(1, true);
-
-	Align stackAlignment(StackAlignment); // Integer to Align instance
-	safestack::StackLayout SSL(stackAlignment);
-	for (AllocaInst *AI : HousedSmartPointers)
-	{
-		Type *Ty = AI->getAllocatedType();
-		u_int64_t Size = getStaticAllocaAllocationSize(AI);
-		assert(Size !=0 && "Size should be bigger than 0");
-		//if (Size == 0) Size = 1;
-
-		unsigned intAlign =
-			std::max((unsigned)DL.getPrefTypeAlignment(Ty), (unsigned)AI->getAlign().value());
-		Align alignment(intAlign);
-		SSL.addObject(AI, Size, alignment, NoColoringRange);
-	}
-
-	SSL.computeLayout();
-	unsigned FrameAlignment = SSL.getFrameAlignment().value();
-
-	if (FrameAlignment > StackAlignment)
-	{
-		assert(isPowerOf2_32(FrameAlignment));
-		IRB.SetInsertPoint(BasePtr->getNextNode());
-
-		// WARNNING : I think this realign alignment for extern stack pointer when alignment changed. but i don't know.
-		BasePtr = cast<Instruction>(IRB.CreateIntToPtr(
-			IRB.CreateAnd(
-				IRB.CreatePtrToInt(BasePtr, IntPtrTy),
-				ConstantInt::get(IntPtrTy, ~u_int64_t(FrameAlignment - 1))),
-			StackPtrTy));
-	}
-
-	for (AllocaInst *AI : HousedSmartPointers)
-	{
-		//errs() << *AI << "\n";
-		IRB.SetInsertPoint(AI);
-		unsigned Offset = SSL.getObjectOffset(AI);
-
-		// dbg
-		// outs() << "move housed smart pointer -- offset : " << Offset << "\n";
-		// dgb
-
-		replaceDbgDeclare(AI, BasePtr, DIB, DIExpression::ApplyOffset, -Offset);
-		replaceDbgValueForAlloca(AI, BasePtr, DIB, -Offset);
-
-		//int i = 0;
-		
-		std::string Name = std::string(AI->getName()) + ".rsp_extern";
-		while (!AI->use_empty())
-		{
-			//i++;
-
-			Use &U = *AI->use_begin();
-			Instruction *User = cast<Instruction>(U.getUser());
-			// outs() << i << ". user : " << *User << "\n"; //dbg
-			
-			Instruction *InsertBefore;
-			if (auto *PHI = dyn_cast<PHINode>(User)){
-				// outs() << "find Phi node\n"; //dbg
-				InsertBefore = PHI->getIncomingBlock(U)->getTerminator();
-				}
-			else
-				InsertBefore = User;
-
-			// WARNNING : need to one more see!!!
-			// this part means that before every user, insert gep instruction to get the extern SP
-			IRBuilder<> IRBUser(InsertBefore);
-			Value *Off = IRBUser.CreateGEP(Int8Ty, BasePtr,
-										   ConstantInt::get(Int32Ty, -Offset));
-			Value *Replacement = IRBUser.CreateBitCast(Off, AI->getType(), Name);
-			// outs() << "   Replacement : " << *Replacement << "\n"; //dbg
-
-			// TODO : need one more see!!!!
-			// a little confused
-			if (auto *PHI = dyn_cast<PHINode>(User))
-				PHI->setIncomingValueForBlock(PHI->getIncomingBlock(U), Replacement);
-			else
-				U.set(Replacement); 
-			
-			//Instruction *user2 = cast<Instruction>(U.getUser()); //dbg
-			//outs() << "   user : " << *user2 << "\n\n";  //dbg
-		}
-		AI->eraseFromParent();
-	}
-
-	unsigned FrameSize = alignTo(SSL.getFrameSize(), StackAlignment);
-	IRB.SetInsertPoint(BasePtr->getNextNode());
-
-	Value *StaticTop =
-		IRB.CreateGEP(Int8Ty, BasePtr, ConstantInt::get(Int32Ty, -FrameSize),
-					  "extern_stack_housed_top");
-	// IRB.CreateStore(StaticTop, ExternStackPtr);
-	// errs() << "Moved static allocas\n";
-	return StaticTop;
-}
-
-void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas, ArrayRef<AllocaInst *> HousedSmartPointers, ArrayRef<ReturnInst *> Returns)
+void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
+						 ArrayRef<AllocaInst *> DynamicAllocas,
+						 ArrayRef<Instruction *> StackRestorePoints,
+						 ArrayRef<ReturnInst *> Returns,
+						 bool isPure)
 {
 	IRBuilder<> IRB(&F.front(), F.begin()->getFirstInsertionPt());
-	IRBuilder<> IRB2(&F.front(), F.begin()->getFirstInsertionPt());
 	/*
 	if (DISubprogram *SP = F.getSubprogram())
 		IRB.SetCurrentDebugLocation(DebugLoc::get(SP->getScopeLine(), 0, SP));
 	*/
-	if(StaticAllocas.empty() && HousedSmartPointers.empty()){
+	if(StaticAllocas.empty()){
 		return;
+	}
+	Value **ExternStackPtr;
+	const char *name;
+	
+	if(isPure){
+		ExternStackPtr = &(this->PureExternStackPtr);
+		name= "extern_stack_pure_ptr";
+	}
+	else{
+		ExternStackPtr = &(this->HousedExternStackPtr);
+		name = "extern_stack_housed_ptr";	
 	}
 	
 	LLVMContext &C = F.getContext();
-
-///
 	std::vector<Value *> args;
 
 	StringRef asmCode = "movq %fs:${1:c}, $0";
 	StringRef constraints = "=r,i,~{dirflag},~{fpsr},~{flags}";
-
 	InlineAsm* inlineAsm = InlineAsm::get(
        	FunctionType::get(Type::getInt64Ty(C), {Type::getInt32Ty(C)}, false),
        	asmCode, constraints, false, false, InlineAsm::AD_ATT);
 
-	//args.push_back(ptrToIntInst);
-	args.push_back(ConstantInt::get(Type::getInt32Ty(C), 56));
-		
+	args.push_back(ConstantInt::get(Type::getInt32Ty(C), 56));		
 	CallInst *FS2MEM = IRB.CreateCall(inlineAsm, args);
-	FS2MEM->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);
-	
+	FS2MEM->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);	
 	// WARNNING 
 	FS2MEM->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::ReadNone);
 	// WARNNING 
 
 	Value *ExternStackPointer = IRB.CreateIntToPtr(FS2MEM, Type::getInt64PtrTy(C));
-	//FunctionCallee Fn = F.getParent()->getOrInsertFunction("FS2MEM", StackPtrTy);
-	//Value* ExternStackPointer= IRB.CreateCall(Fn);
-///
 
 	Type *int64Ptr = Type::getInt64PtrTy(C);
+	ExternStackPointer = IRB.CreateIntToPtr(ExternStackPointer, int64Ptr);
 	ExternStackPointer = IRB.CreateBitCast(ExternStackPointer, int64Ptr->getPointerTo(0));
-	this->ExternStackPtr =
-    	IRB.CreateBitCast(ExternStackPointer, StackPtrTy->getPointerTo(0));
-	
-	Instruction *BasePtr;
-	Value *PureTop;
 
-	if(!StaticAllocas.empty()){
-		BasePtr = IRB.CreateLoad(StackPtrTy, ExternStackPtr, false, "extern_stack_ptr_pure");
-
-		PureTop = moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr);
-	
-		IRB.SetInsertPoint(cast<Instruction>(PureTop)->getNextNode());
-		IRB.CreateStore(PureTop, ExternStackPtr);
+	*ExternStackPtr =
+		IRB.CreateBitCast(ExternStackPointer, StackPtrTy->getPointerTo(0));
+	if(!isPure){
+		*ExternStackPtr = cast<Instruction>(IRB.CreateGEP(Type::getInt8Ty(C), *ExternStackPtr, ConstantInt::get(Int32Ty, 8)));		
 	}
+	
+	Instruction *BasePtr = IRB.CreateLoad(StackPtrTy, *ExternStackPtr, false, name);
+	Value *StaticTop = moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr, *ExternStackPtr, isPure);
+	//IRB.SetInsertPoint(cast<Instruction>(PureTop)->getNextNode());
+	//IRB.CreateStore(StaticTop, PureExternStackPtr);
+	AllocaInst *DynamicTop = createStackRestorePoints(
+		IRB, F, StackRestorePoints, StaticTop, *ExternStackPtr,!DynamicAllocas.empty(), isPure);
 
-	Instruction *temp;
-	Instruction *HousedBasePtr;
-	Value *HousedTop;	
-
-	if(!HousedSmartPointers.empty()){	
-		temp = cast<Instruction>(IRB2.CreateGEP(Type::getInt8Ty(C), ExternStackPtr, ConstantInt::get(Int32Ty, 8)));
-		HousedBasePtr = IRB2.CreateLoad(StackPtrTy, temp, false, "extern_stack_ptr_housed"); 
-
-		HousedTop = moveHousedSmartPtrsToExternStack(IRB2, F, HousedSmartPointers, HousedBasePtr);
-
-		IRB2.SetInsertPoint(cast<Instruction>(HousedTop)->getNextNode());
-		IRB2.CreateStore(HousedTop, temp);
-	}	
+	moveDynamicAllocasToExternStack(F, *ExternStackPtr, DynamicTop,
+									DynamicAllocas);
 
 	for (ReturnInst *RI : Returns)
 	{
 		IRB.SetInsertPoint(RI);
-		if(!StaticAllocas.empty()){
-			IRB.CreateStore(BasePtr, ExternStackPtr);
-		}
-		if(!HousedSmartPointers.empty()){
-			IRB.CreateStore(HousedBasePtr, temp);
-		}
-		//FunctionCallee Fn_Restore = F.getParent()->getOrInsertFunction("register_2_memory", StackPtrTy, voidPtrType);
-		/*FunctionCallee Fn_Restore =	F.getParent()->getOrInsertFunction("MEM2GS", Type::getVoidTy(F.getContext()), StackPtrTy);
-		args.clear();
-		args.push_back(BasePtr);
-		IRB.CreateCall(Fn_Restore, args);*/
+		IRB.CreateStore(BasePtr, *ExternStackPtr);
 	}
 	
 }
-
-
 
 //--------------------------------pass definition--------------------------------//
 
@@ -437,7 +417,10 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 	externStack = new ExternStack(F, *DL);
 
 	SmallVector<AllocaInst *, 4> StaticArrayAllocas;
-	SmallVector<AllocaInst *, 4> HousedSmartPoninters;	
+	SmallVector<AllocaInst *, 4> DynamicArrayAllocas;
+	SmallVector<AllocaInst *, 4> StaticHousedAllocas;
+	SmallVector<AllocaInst *, 4> DynamicHousedAllocas;
+	SmallVector<Instruction *, 8> StackRestorePoints;
 	SmallVector<ReturnInst *, 4> Returns;
 	
 	bool foundMovable = false;
@@ -453,21 +436,6 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		FunctionCallee Fn = F.getParent()->getOrInsertFunction(
 			"__get_wrapper", StackPtrTy);
 		Value *ExternStackPtr = IRB.CreateCall(Fn);
-
-		/*std::vector<Type *> arg_type;
-		std::vector<Value *> args;
-		LLVMContext &C = F.getContext();
-		MDNode *N = MDNode::get(C, {MDString::get(C, "r15")});
-		arg_type.push_back(Type::getInt64Ty(C));
-		Function *writeRegisterFunc = Intrinsic::getDeclaration(
-			F.getParent(), Intrinsic::write_register, arg_type);
-
-		Value *ptrToIntInst = IRB.CreatePtrToInt(ExternStackPtr, Type::getInt64Ty(C));
-
-		args.push_back(MetadataAsValue::get(C, N));
-		args.push_back(ptrToIntInst);
-
-		IRB.CreateCall(writeRegisterFunc, args);*/
 		
 		std::vector<Value *> args;
 
@@ -482,17 +450,9 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		args.push_back(ptrToIntInst);
 		args.push_back(ConstantInt::get(int32Ty, 56));
 		
-
 		CallInst *MEM2FS = IRB.CreateCall(inlineAsm, args);
 		MEM2FS->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);
 
-
-		/*FunctionCallee MEM2GS = F.getParent()->getOrInsertFunction(
-			"MEM2FS", Type::getVoidTy(F.getContext()), StackPtrTy);
-		std::vector<Value *> args;
-		args.push_back(ExternStackPtr);
-		IRB.CreateCall(MEM2GS, args);	
-		*/
 		return true;
 	}
 
@@ -504,15 +464,13 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 			{
 				if (CI->getCalledFunction() && CI->canReturnTwice())
 				{
-					//StackRestorePoints.push_back(CI);
+					StackRestorePoints.push_back(CI);
 				}
 			}
-
 			else if (auto LPI = dyn_cast<LandingPadInst>(&I))
 			{
-				//StackRestorePoints.push_back(LPI);
+				StackRestorePoints.push_back(LPI);
 			}
-
 			else if (auto AI = dyn_cast<AllocaInst>(&I))
 			{
 				if (AI->hasMetadata("RustMeta-Smart-Pointer"))
@@ -528,8 +486,6 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 					}
 					else
 					{
-						assert(AI->isStaticAlloca() && "Dynamic Alloca inst is not yet implemented");
-						/*
 						if (std::find(DynamicArrayAllocas.begin(),
 									  DynamicArrayAllocas.end(),
 									  AI) == DynamicArrayAllocas.end())
@@ -537,25 +493,29 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 							DynamicArrayAllocas.push_back(AI);
 							foundMovable = true;
 						}
-						*/
 					}
-
 				}
-				else if (AI->hasMetadata("RustMeta-Smart-Pointer-House"))
+				else
 				{
 					if (AI->isStaticAlloca())
 					{
-						// WARNNING : I think find() function isn't need.
-						if (std::find(HousedSmartPoninters.begin(), HousedSmartPoninters.end(),
-									  AI) == HousedSmartPoninters.end())
+						if (std::find(StaticHousedAllocas.begin(), StaticHousedAllocas.end(),
+									  AI) == StaticHousedAllocas.end())
 						{
-							HousedSmartPoninters.push_back(AI);
+							StaticHousedAllocas.push_back(AI);
 							foundMovable = true;
 						}
 					}
-					else{
-						assert(AI->isStaticAlloca() && "Dynamic Alloca inst is not yet implemented");	
-					}
+					else
+					{
+						if (std::find(DynamicHousedAllocas.begin(),
+									  DynamicHousedAllocas.end(),
+									  AI) == DynamicHousedAllocas.end())
+						{
+							DynamicHousedAllocas.push_back(AI);
+							foundMovable = true;
+						}
+					}	
 				}
 			}
 
@@ -568,10 +528,10 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 
 	if (foundMovable)
 	{
-		std::reverse(StaticArrayAllocas.begin(), StaticArrayAllocas.end());
-		std::reverse(HousedSmartPoninters.begin(), HousedSmartPoninters.end());
-		std::reverse(Returns.begin(), Returns.end());
-		externStack->run(StaticArrayAllocas, HousedSmartPoninters, Returns);
+		externStack->run(StaticArrayAllocas, DynamicArrayAllocas,
+						 StackRestorePoints, Returns, true);
+		externStack->run(StaticHousedAllocas, DynamicHousedAllocas,
+						 StackRestorePoints, Returns, false);
 	}
 	return foundMovable;
 }
