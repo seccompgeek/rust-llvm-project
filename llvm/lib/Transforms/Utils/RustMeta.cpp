@@ -17,7 +17,7 @@ std::string MetaUpdateSMAPIPass::typeToString(Type* type){
 PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
                                                ModuleAnalysisManager &AM) {
 
-  /*Find special types housed in normal structs and insert new structs to replace them*/
+  /*Find special types housed in normal structs and insert new structs to replace them
   auto structTypes = M.getIdentifiedStructTypes();
   auto specialTypeMetadata = M.getNamedMetadata("SpecialTypes");
   std::map<StructType*, StructType*> specialTypeHousedStructsMap;
@@ -78,7 +78,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         auto len = memInst->getLength();
       }
     }
-  }
+  }*/
 
   for (auto &Func: M){
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
