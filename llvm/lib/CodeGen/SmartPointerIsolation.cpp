@@ -473,7 +473,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 			}
 			else if (auto AI = dyn_cast<AllocaInst>(&I))
 			{
-				if (AI->hasMetadata("RustMeta-Smart-Pointer"))
+				if (AI->hasMetadata("RustMeta-Smart-Pointer") || AI->hasMetadata("RustMeta-Smart-Pointer-House"))
 				{
 					if (AI->isStaticAlloca())
 					{
@@ -495,7 +495,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 						}
 					}
 				}
-				else
+				/*else if (AI->hasMetadata("RustMeta-Smart-Pointer"))
 				{
 					if (AI->isStaticAlloca())
 					{
@@ -516,7 +516,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 							foundMovable = true;
 						}
 					}	
-				}
+				}*/
 			}
 
 			else if (auto RI = dyn_cast<ReturnInst>(&I))
