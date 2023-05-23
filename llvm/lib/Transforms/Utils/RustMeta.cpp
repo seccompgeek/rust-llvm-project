@@ -157,7 +157,9 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
       for(auto it: candidateCallSites){
         Builder.SetInsertPoint(it.first);
         auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), it.second, false);
-        Builder.CreateStore(Index, TDISlot, true);
+        auto store = Builder.CreateStore(Index, TDISlot, true);
+        MDNode* N = MDNode::get(Context, MDString::get(Context, "added by metaupdate pass"));
+        store->setMetadata("TDIIndexStore", N);
         /*if(auto callInst = dyn_cast<CallInst>(it.first)){
           Builder.SetInsertPoint(it.first->getNextNode());
           Builder.CreateStore(ResetValue, TDISlot, false);
@@ -179,7 +181,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         Builder.SetInsertPoint(it);
         auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);
         auto store = Builder.CreateStore(Index, TDISlot, true);
-        MDNode* N = MDNode::get(M.getContext(), MDString::get("added by metaupdate pass"));
+        MDNode* N = MDNode::get(Context, MDString::get(Context, "added by metaupdate pass"));
         store->setMetadata("TDIIndexStore", N);
       }
 
