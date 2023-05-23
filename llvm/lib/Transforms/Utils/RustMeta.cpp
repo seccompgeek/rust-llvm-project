@@ -84,6 +84,9 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
     std::map<Instruction*, size_t> candidateCallSites;
     std::set<Instruction*> externFuncCalls;
+    std::set<Instruction*> unnecessaryStores;
+    std::map<uint64_t, uint64_t> optimizedIndices;
+
     Instruction* getTDISlotInsertPoint = nullptr;
     bool Allocas = true;
     for(auto &BB: Func){
@@ -111,6 +114,27 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
           }else if(auto F = call->getCalledFunction()){
             if(F->getMetadata("ExternFunc")){
               externFuncCalls.insert(call);
+            }
+          }
+        }else if (auto store = dyn_cast<StoreInst>(&Inst)){
+          auto dest = store->getPointerOperand();
+          if(auto TDIIndex = dyn_cast<GlobalVariable>(dest)){
+            if(TDIIndex->getName().equals("_mi_tdi_index")){
+              if(store->hasMetadata("noalias")){
+                unnecessaryStores.insert(store);
+                continue;
+              }
+              auto storedValue = dyn_cast<ConstantInt>(store->getValueOperand());
+              auto actualValue = storedValue->getZExtValue();
+              if(actualValue == 1){
+                continue;
+              }
+              if(optimizedIndices.find(actualValue) != optimizedIndices.end()){
+                store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), optimizedIndices[actualValue]));
+              } else{
+                optimizedIndices.insert(std::make_pair(actualValue, optimizedIndices.size()+2));
+                store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), optimizedIndices[actualValue]));
+              }
             }
           }
         }
@@ -154,7 +178,13 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
       for(auto it: externFuncCalls){
         Builder.SetInsertPoint(it);
         auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);
-        Builder.CreateStore(Index, TDISlot, true);
+        auto store = Builder.CreateStore(Index, TDISlot, true);
+        MDNode* N = MDNode::get(M.getContext(), MDString::get("added by metaupdate pass"));
+        store->setMetadata("TDIIndexStore", N);
+      }
+
+      for(auto unstore: unnecessaryStores){
+        unstore->eraseFromParent();
       }
     }
   }
