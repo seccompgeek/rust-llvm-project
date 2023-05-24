@@ -578,11 +578,11 @@ PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &F
   };
 
   auto getACT = [&]() -> AssumptionCache& {
-    return FAM.getResult<AssumptionCacheTracker>(F);
+    return FAM.getResult<AssumptionAnalysis>(F);
   };
 
   auto getDTWP = [&]() -> DomTreeUpdater* {
-    return FAM.getCachedResult<DominatorTreeWrapperPass>(F);
+    return FAM.getCachedResult<DominatorTreeAnalysis>(F);
   };
 
   this->TM = getTM();
