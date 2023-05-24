@@ -15,7 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 
-#include "RustMetaSafeStack.h"
+#include "llvm/CodeGen/RustMetaSafeStack.h"
+#include "SafeStackLayout.h"
 
 using namespace llvm;
 using namespace llvm::safestack;
