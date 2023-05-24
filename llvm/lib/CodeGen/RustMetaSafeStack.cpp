@@ -15,8 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 
-#include "llvm/CodeGen/RustMetaSafeStack.h"
-#include "SafeStackLayout.h"
+#include "RustMetaSafeStack.h"
 
 using namespace llvm;
 using namespace llvm::safestack;
@@ -562,44 +561,56 @@ bool MetaSafeStack::run() {
   LLVM_DEBUG(dbgs() << "[MetaSafeStack]     safestack applied\n");
   return true;
 }
-}
 
-PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &FAM){
-  if(F.isDeclaration()){
-    return PreservedAnalyses::all();
+
+class MetaSafeStackLegacyPass : public FunctionPass {
+  const TargetMachine *TM = nullptr;
+
+public:
+  static char ID; // Pass identification, replacement for typeid..
+
+  MetaSafeStackLegacyPass() : FunctionPass(ID) {
+    initializeMetaSafeStackLegacyPassPass(*PassRegistry::getPassRegistry());
   }
 
-  auto getTM = [&]() -> TargetMachine* {
-    return &FAM.getResult<TargetPassConfig>(F);
-  };
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.addRequired<TargetPassConfig>();
+    AU.addRequired<TargetLibraryInfoWrapperPass>();
+    AU.addRequired<AssumptionCacheTracker>();
+    AU.addPreserved<DominatorTreeWrapperPass>();
+  }
 
-  auto getTLI = [&]() -> TargetLibraryInfo& {
-    return FAM.getResult<TargetLibraryAnalysis>(F);
-  };
+  bool runOnFunction(Function &F) override {
+    LLVM_DEBUG(dbgs() << "[MetaSafeStack] Function: " << F.getName() << "\n");
 
-  auto getACT = [&]() -> AssumptionCache& {
-    return FAM.getResult<AssumptionAnalysis>(F);
-  };
 
-  auto getDTWP = [&]() -> DomTreeUpdater* {
-    return FAM.getCachedResult<DominatorTreeAnalysis>(F);
-  };
+    if (F.isDeclaration()) {
+      LLVM_DEBUG(dbgs() << "[MetaSafeStack]     function definition"
+                           " is not available\n");
+      return false;
+    }
 
-  this->TM = getTM();
-  auto *TL = TM->getSubtargetImpl(F)->getTargetLowering();
+    TM = &getAnalysis<TargetPassConfig>().getTM<TargetMachine>();
+    auto *TL = TM->getSubtargetImpl(F)->getTargetLowering();
     if (!TL)
       report_fatal_error("TargetLowering instance is required");
-  auto* DL = &F.getParent()->getDataLayout();
-  auto &TLI = getTLI();
-  auto &ACT = getACT();
-  DominatorTree *DT;
+
+    auto *DL = &F.getParent()->getDataLayout();
+    auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
+    auto &ACT = getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
+
+    // Compute DT and LI only for functions that have the attribute.
+    // This is only useful because the legacy pass manager doesn't let us
+    // compute analyzes lazily.
+
+    DominatorTree *DT;
     bool ShouldPreserveDominatorTree;
     Optional<DominatorTree> LazilyComputedDomTree;
 
     // Do we already have a DominatorTree avaliable from the previous pass?
     // Note that we should *NOT* require it, to avoid the case where we end up
     // not needing it, but the legacy PM would have computed it for us anyways.
-    if (auto *DTWP = getDTWP()) {
+    if (auto *DTWP = getAnalysisIfAvailable<DominatorTreeWrapperPass>()) {
       DT = &DTWP->getDomTree();
       ShouldPreserveDominatorTree = true;
     } else {
@@ -616,16 +627,28 @@ PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &F
 
     ScalarEvolution SE(F, TLI, ACT, *DT, LI);
 
-    if(MetaSafeStack(F, *TL, *DL, ShouldPreserveDominatorTree ? &DTU : nullptr,
+    return MetaSafeStack(F, *TL, *DL, ShouldPreserveDominatorTree ? &DTU : nullptr,
                      SE)
-        .run()){
-        PreservedAnalyses preserved;
-        preserved.preserve<DominatorTreeWrapperPass>();
-        return preserved;
-    }else{
-      return PreservedAnalyses::all();
-    }
+        .run();
+  }
+};
+
+} // end anonymous namespace
+
+using namespace llvm;
+char MetaSafeStackLegacyPass::ID = 0;
+INITIALIZE_PASS(MetaSafeStackLegacyPass, DEBUG_TYPE,
+                      "RustMeta Safe Stack instrumentation pass", false, false)
+
+FunctionPass *llvm::createMetaSafeStackPass() { return new MetaSafeStackLegacyPass(); }
+
+
+PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &FAM){
+  if(llvm::createMetaSafeStackPass()->runOnFunction(F)){
+    PreservedAnalyses preseved;
+    preserved.preserve<>();
+    return preserved;
+  }else{
+    return PreservedAnalyses::all();
+  }
 }
-
-
-
