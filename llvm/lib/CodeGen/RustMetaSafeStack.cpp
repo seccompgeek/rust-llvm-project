@@ -106,9 +106,6 @@ class MetaSafeStack {
   /// might expect to appear on the stack on most common targets.
   static constexpr Align StackAlignment = Align::Constant<16>();
 
-  /// Return the value of the stack canary.
-  Value *getStackGuard(IRBuilder<> &IRB, Function &F);
-
   /// Find all static allocas, dynamic allocas, return instructions and
   /// stack restore points (exception unwind blocks and setjmp calls) in the
   /// given function and append them to the respective vectors.
@@ -337,8 +334,6 @@ Value *MetaSafeStack::moveStaticAllocasToUnsafeStack(
 
   StackLifetime SSC(F, StaticAllocas, StackLifetime::LivenessType::May);
   static const StackLifetime::LiveRange NoColoringRange(1, true);
-  if (ClColoring)
-    SSC.run();
 
   for (const auto *I : SSC.getMarkers()) {
     auto *Op = dyn_cast<Instruction>(I->getOperand(1));
@@ -350,12 +345,6 @@ Value *MetaSafeStack::moveStaticAllocasToUnsafeStack(
 
   // Unsafe stack always grows down.
   StackLayout SSL(StackAlignment);
-  if (StackGuardSlot) {
-    Type *Ty = StackGuardSlot->getAllocatedType();
-    Align Align = std::max(DL.getPrefTypeAlign(Ty), StackGuardSlot->getAlign());
-    SSL.addObject(StackGuardSlot, getStaticAllocaAllocationSize(StackGuardSlot),
-                  Align, SSC.getFullLiveRange());
-  }
 
   for (AllocaInst *AI : StaticAllocas) {
     Type *Ty = AI->getAllocatedType();
@@ -563,7 +552,7 @@ bool MetaSafeStack::run() {
 
   // Find all static and dynamic alloca instructions that must be moved to the
   // unsafe stack, all return instructions and stack restore points.
-  findInsts(F, StaticAllocas, StaticAllocaHouses, DynamicAllocas, DynamicAllocaHouses, ByValArguments, Returns,
+  findInsts(F, StaticAllocas, StaticAllocaHouses, DynamicAllocas, DynamicAllocaHouses, Returns,
             StackRestorePoints);
 
   if (StaticAllocas.empty() && StaticAllocaHouses.empty() && DynamicAllocas.empty() &&
