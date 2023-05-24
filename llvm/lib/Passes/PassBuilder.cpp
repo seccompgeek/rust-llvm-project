@@ -251,6 +251,7 @@
 #include "llvm/CodeGen/SmartPointerIsolation.h"
 
 #include "llvm/Transforms/RustMeta.h"
+#include "llvm/CodeGen/RustMetaSafeStack.h"
 
 using namespace llvm;
 

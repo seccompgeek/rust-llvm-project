@@ -14,66 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SafeStackLayout.h"
-#include "llvm/ADT/APInt.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Analysis/AssumptionCache.h"
-#include "llvm/Analysis/BranchProbabilityInfo.h"
-#include "llvm/Analysis/DomTreeUpdater.h"
-#include "llvm/Analysis/InlineCost.h"
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpressions.h"
-#include "llvm/Analysis/StackLifetime.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
-#include "llvm/CodeGen/TargetLowering.h"
-#include "llvm/CodeGen/TargetPassConfig.h"
-#include "llvm/CodeGen/TargetSubtargetInfo.h"
-#include "llvm/IR/Argument.h"
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/ConstantRange.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DIBuilder.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Dominators.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/InstIterator.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/MDBuilder.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Use.h"
-#include "llvm/IR/Value.h"
-#include "llvm/InitializePasses.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/MathExtras.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Transforms/Utils/Local.h"
-#include <algorithm>
-#include <cassert>
-#include <cstdint>
-#include <string>
-#include <utility>
+
+#include "llvm/CodeGen/RustMetaSafeStack.h"
 
 using namespace llvm;
 using namespace llvm::safestack;
 
-#define DEBUG_TYPE "meta-safe-stack"
+#define DEBUG_TYPE "metasafe-stack"
 
 
 namespace {
@@ -614,49 +561,32 @@ bool MetaSafeStack::run() {
   LLVM_DEBUG(dbgs() << "[MetaSafeStack]     safestack applied\n");
   return true;
 }
+}
 
-namespace llvm {
-class MetaSafeStackLegacyPass : public FunctionPass {
-  const TargetMachine *TM = nullptr;
-
-public:
-  static char ID; // Pass identification, replacement for typeid..
-
-  MetaSafeStackLegacyPass() : FunctionPass(ID) {
-    initializeMetaSafeStackLegacyPassPass(*PassRegistry::getPassRegistry());
+PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &FAM){
+  if(F.isDeclaration()){
+    return PreservedAnalyses::all();
   }
 
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<TargetPassConfig>();
-    AU.addRequired<TargetLibraryInfoWrapperPass>();
-    AU.addRequired<AssumptionCacheTracker>();
-    AU.addPreserved<DominatorTreeWrapperPass>();
+  auto getTM = [&]() -> TargetMachine* {
+    return FAM.getCachedResult<TargetPassConfig>(F).getTM<TargetMachine>();
   }
 
-  bool runOnFunction(Function &F) override {
-    LLVM_DEBUG(dbgs() << "[MetaSafeStack] Function: " << F.getName() << "\n");
+  auto getTLI = [&]() -> TargetLibraryInfo& {
+    return FAM.getCachedResult<TargetLibraryInfoWrapperPass>(F)
+  }
 
-
-    if (F.isDeclaration()) {
-      LLVM_DEBUG(dbgs() << "[MetaSafeStack]     function definition"
-                           " is not available\n");
-      return false;
-    }
-
-    TM = &getAnalysis<TargetPassConfig>().getTM<TargetMachine>();
-    auto *TL = TM->getSubtargetImpl(F)->getTargetLowering();
+  auto getACT = [&]() -> AssumptionCache& {
+    return FAM.getCachedResult<AssumptionCacheTracker>(F)
+  }
+  TM = getTM();
+  auto *TL = TM->getSubtargetImpl(F)->getTargetLowering();
     if (!TL)
       report_fatal_error("TargetLowering instance is required");
-
-    auto *DL = &F.getParent()->getDataLayout();
-    auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
-    auto &ACT = getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
-
-    // Compute DT and LI only for functions that have the attribute.
-    // This is only useful because the legacy pass manager doesn't let us
-    // compute analyzes lazily.
-
-    DominatorTree *DT;
+  auto* DL = &F.getParent()->getDataLayout();
+  auto &TLI = getTLI();
+  auto &ACT = getACT();
+  DominatorTree *DT;
     bool ShouldPreserveDominatorTree;
     Optional<DominatorTree> LazilyComputedDomTree;
 
@@ -680,20 +610,16 @@ public:
 
     ScalarEvolution SE(F, TLI, ACT, *DT, LI);
 
-    return MetaSafeStack(F, *TL, *DL, ShouldPreserveDominatorTree ? &DTU : nullptr,
+    if(MetaSafeStack(F, *TL, *DL, ShouldPreserveDominatorTree ? &DTU : nullptr,
                      SE)
-        .run();
-  }
-};
-} //llvm
+        .run()){
+        PreservedAnalyses preserved;
+        preserved.preserve<DominatorTreeWrapperPass>();
+        return preserved;
+    }else{
+      return PreservedAnalyses::all();
+    }
+}
 
-} // end anonymous namespace
-
-using namespace llvm;
-char MetaSafeStackLegacyPass::ID = 0;
-
-INITIALIZE_PASS(MetaSafeStackLegacyPass, "metasafe-stack", "MetaSafe smart pointer safe stack", false, false);
-
-FunctionPass *llvm::createMetaSafeStackPass() { return new MetaSafeStackLegacyPass(); }
 
 
