@@ -571,19 +571,19 @@ PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &F
 
   auto getTM = [&]() -> TargetMachine* {
     return FAM.getResult<TargetPassConfig>(F);
-  }
+  };
 
   auto getTLI = [&]() -> TargetLibraryInfo& {
     return FAM.getResult<TargetLibraryInfoWrapperPass>(F);
-  }
+  };
 
   auto getACT = [&]() -> AssumptionCache& {
     return FAM.getResult<AssumptionCacheTracker>(F);
-  }
+  };
 
   auto getDTWP = [&]() -> DomTreeUpdater* {
     return FAM.getCachedResult<DominatorTreeWrapperPass>(F);
-  }
+  };
 
   this->TM = getTM();
   auto *TL = TM->getSubtargetImpl(F)->getTargetLowering();
