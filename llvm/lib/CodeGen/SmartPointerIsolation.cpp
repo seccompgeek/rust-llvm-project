@@ -86,7 +86,7 @@ uint64_t ExternStack::getStaticAllocaAllocationSize(AllocaInst *AI)
 {
 	uint64_t Size = DL.getTypeAllocSize(AI->getAllocatedType());
 	auto C = dyn_cast<ConstantInt>(AI->getArraySize());
-	//if (!C) return 0;
+	if (!C) return 0;
 	Size *= C->getZExtValue();
 	return Size;
 }
@@ -347,7 +347,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	args.push_back(ConstantInt::get(Type::getInt32Ty(C), 56));		
 	CallInst *FS2MEM = IRB.CreateCall(inlineAsm, args);
 	FS2MEM->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);	
-	// WARNNING 
+	// WARNNING
 	FS2MEM->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::ReadNone);
 	// WARNNING 
 
