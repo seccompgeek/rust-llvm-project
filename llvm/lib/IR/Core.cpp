@@ -934,7 +934,7 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   static std::map<uint64_t, uint64_t> TDIIndexMap;
   if(Indx != 1){
     if(TDIIndexMap.find(Indx) == TDIIndexMap.end()){
-      TDIIndexMap.insert(TDIIndexMap.size() + 2);
+      TDIIndexMap.insert(std::make_pair(Indx,TDIIndexMap.size() + 2));
     }
     Indx = TDIIndexMap[Indx];
   }
