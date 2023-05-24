@@ -17,55 +17,6 @@
 
 #include "llvm/CodeGen/RustMetaSafeStack.h"
 #include "SafeStackLayout.h"
-#include "llvm/ADT/APInt.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Analysis/AssumptionCache.h"
-#include "llvm/Analysis/BranchProbabilityInfo.h"
-#include "llvm/Analysis/DomTreeUpdater.h"
-#include "llvm/Analysis/InlineCost.h"
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpressions.h"
-#include "llvm/Analysis/StackLifetime.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
-#include "llvm/CodeGen/TargetLowering.h"
-#include "llvm/CodeGen/TargetPassConfig.h"
-#include "llvm/CodeGen/TargetSubtargetInfo.h"
-#include "llvm/IR/Argument.h"
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/ConstantRange.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DIBuilder.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Dominators.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/InstIterator.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/MDBuilder.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Use.h"
-#include "llvm/IR/Value.h"
-#include "llvm/InitializePasses.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/MathExtras.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Transforms/Utils/Local.h"
 
 using namespace llvm;
 using namespace llvm::safestack;
@@ -619,16 +570,21 @@ PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &F
   }
 
   auto getTM = [&]() -> TargetMachine* {
-    return FAM.getCachedResult<TargetPassConfig>(F).getTM<TargetMachine>();
+    return FAM.getResult<TargetPassConfig>(F);
   }
 
   auto getTLI = [&]() -> TargetLibraryInfo& {
-    return FAM.getCachedResult<TargetLibraryInfoWrapperPass>(F);
+    return FAM.getResult<TargetLibraryInfoWrapperPass>(F);
   }
 
   auto getACT = [&]() -> AssumptionCache& {
-    return FAM.getCachedResult<AssumptionCacheTracker>(F);
+    return FAM.getResult<AssumptionCacheTracker>(F);
   }
+
+  auto getDTWP = [&]() -> DomTreeUpdater* {
+    return FAM.getCachedResult<DominatorTreeWrapperPass>(F);
+  }
+
   this->TM = getTM();
   auto *TL = TM->getSubtargetImpl(F)->getTargetLowering();
     if (!TL)
@@ -643,7 +599,7 @@ PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &F
     // Do we already have a DominatorTree avaliable from the previous pass?
     // Note that we should *NOT* require it, to avoid the case where we end up
     // not needing it, but the legacy PM would have computed it for us anyways.
-    if (auto *DTWP = getAnalysisIfAvailable<DominatorTreeWrapperPass>()) {
+    if (auto *DTWP = getDTWP()) {
       DT = &DTWP->getDomTree();
       ShouldPreserveDominatorTree = true;
     } else {
