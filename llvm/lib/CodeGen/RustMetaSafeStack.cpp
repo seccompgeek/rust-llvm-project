@@ -689,6 +689,7 @@ public:
 
 } // end anonymous namespace
 
+using namespace llvm;
 char MetaSafeStackLegacyPass::ID = 0;
 
 INITIALIZE_PASS(MetaSafeStackLegacyPass, "metasafe-stack", "MetaSafe smart pointer safe stack", false, false);
