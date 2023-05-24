@@ -355,8 +355,7 @@ Value *MetaSafeStack::moveStaticAllocasToUnsafeStack(
     // Ensure the object is properly aligned.
     Align Align = std::max(DL.getPrefTypeAlign(Ty), AI->getAlign());
 
-    SSL.addObject(AI, Size, Align,
-                  ClColoring ? SSC.getLiveRange(AI) : NoColoringRange);
+    SSL.addObject(AI, Size, Align, NoColoringRange);
   }
 
   SSL.computeLayout();
@@ -570,7 +569,7 @@ bool MetaSafeStack::run() {
     FunctionCallee Fn = F.getParent()->getOrInsertFunction(
         "__safestack_pointer_wrapper", StackPtrTy->getPointerTo(0));
     UnsafeStackPtr = IRB.CreateCall(Fn);
-    HouseStackPtr = IRB.CreateGEP(StackPtrTy->getPointerTo(), UnsafeStackPtr, {1});
+    HouseStackPtr = IRB.CreateGEP(StackPtrTy, UnsafeStackPtr, ConstantInt::get(Int8Ty, 1));
 
   // Load the current stack pointer (we'll also use it as a base pointer).
   // FIXME: use a dedicated register for it ?
@@ -596,12 +595,12 @@ bool MetaSafeStack::run() {
   AllocaInst *DynamicTop = createStackRestorePoints(
       IRB, F, StackRestorePoints, StaticTop, !DynamicAllocas.empty());
   AllocaInst *DynamicHouseTop = createStackRestorePoints(
-    IRB, F, StackRestorPoints, StaticTop, !DynamicAllocaHouses.empty());
+    IRB, F, StackRestorePoints, StaticTop, !DynamicAllocaHouses.empty());
 
   // Handle dynamic allocas.
   moveDynamicAllocasToUnsafeStack(F, UnsafeStackPtr, DynamicTop,
                                   DynamicAllocas);
-  moveDynamicAllocasToUnsafeStack(F, HouseStackPtrm DynamicHouseTop, DynamicAllocaHouses);
+  moveDynamicAllocasToUnsafeStack(F, HouseStackPtr, DynamicHouseTop, DynamicAllocaHouses);
 
   // Restore the unsafe stack pointer before each return.
   for (Instruction *RI : Returns) {
@@ -636,11 +635,6 @@ public:
   bool runOnFunction(Function &F) override {
     LLVM_DEBUG(dbgs() << "[MetaSafeStack] Function: " << F.getName() << "\n");
 
-    if (!F.hasFnAttribute(Attribute::MetaSafeStack)) {
-      LLVM_DEBUG(dbgs() << "[MetaSafeStack]     safestack is not requested"
-                           " for this function\n");
-      return false;
-    }
 
     if (F.isDeclaration()) {
       LLVM_DEBUG(dbgs() << "[MetaSafeStack]     function definition"
