@@ -570,7 +570,7 @@ PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &F
   }
 
   auto getTM = [&]() -> TargetMachine* {
-    return FAM.getResult<TargetPassConfig>(F);
+    return &FAM.getResult<TargetPassConfig>().getTM<TargetMachine>();
   };
 
   auto getTLI = [&]() -> TargetLibraryInfo& {
