@@ -40,6 +40,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <system_error>
+#include <map>
 
 using namespace llvm;
 
@@ -925,6 +926,18 @@ void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, unsigned long long TypeId){
 
 void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   Instruction* inst = unwrap<Instruction>(TDIIndexPlace);
+  Function* parentFunc = inst->getParent()->getParent();
+  if(parentFunc->getMetadata("SmartPointerAPIFunc")){
+    return;
+  }
+
+  static std::map<uint64_t, uint64_t> TDIIndexMap;
+  if(Indx != 1){
+    if(TDIIndexMap.find(Indx) == TDIIndexMap.end()){
+      TDIIndexMap.insert(TDIIndexMap.size() + 2);
+    }
+    Indx = TDIIndexMap[Indx];
+  }
   auto &context = inst->getContext();
   IRBuilder<> Builder(inst);
   Builder.SetInsertPoint(inst);
