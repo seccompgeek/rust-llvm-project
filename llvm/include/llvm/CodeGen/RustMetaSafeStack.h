@@ -12,7 +12,7 @@ namespace llvm {
     class MetaSafeStackPass : public PassInforMixin<MetaSafeStackPass> {
         const TargetMachine* TM = nullptr;
         public:
-        PreservedAnalyses run(Module &M, FunctionAnalysisManager &FAM);
+        PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
     };
 }
 
