@@ -623,13 +623,13 @@ PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &F
   }
 
   auto getTLI = [&]() -> TargetLibraryInfo& {
-    return FAM.getCachedResult<TargetLibraryInfoWrapperPass>(F)
+    return FAM.getCachedResult<TargetLibraryInfoWrapperPass>(F);
   }
 
   auto getACT = [&]() -> AssumptionCache& {
-    return FAM.getCachedResult<AssumptionCacheTracker>(F)
+    return FAM.getCachedResult<AssumptionCacheTracker>(F);
   }
-  TM = getTM();
+  this->TM = getTM();
   auto *TL = TM->getSubtargetImpl(F)->getTargetLowering();
     if (!TL)
       report_fatal_error("TargetLowering instance is required");
