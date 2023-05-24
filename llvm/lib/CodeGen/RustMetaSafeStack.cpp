@@ -574,7 +574,7 @@ PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &F
   };
 
   auto getTLI = [&]() -> TargetLibraryInfo& {
-    return FAM.getResult<TargetLibraryInfoWrapperPass>(F);
+    return FAM.getResult<TargetLibraryAnalysis>(F);
   };
 
   auto getACT = [&]() -> AssumptionCache& {
