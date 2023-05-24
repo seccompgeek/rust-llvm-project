@@ -564,6 +564,8 @@ namespace llvm {
   FunctionPass *createSelectOptimizePass();
 
   FunctionPass *createRustSmartPointerIsolationPass();
+
+  FunctionPass *createMetaSafeStackPass();
 } // End llvm namespace
 
 #endif

@@ -160,6 +160,7 @@ namespace {
       (void) llvm::createRegionViewerPass();
       (void) llvm::createSCCPPass();
       (void) llvm::createSafeStackPass();
+      (void) llvm::createMetaSafeStackPass(); //RustMeta
       (void) llvm::createSROAPass();
       (void) llvm::createSingleLoopExtractorPass();
       (void) llvm::createStripSymbolsPass();
