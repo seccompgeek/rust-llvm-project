@@ -530,15 +530,15 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 	{
 		externStack->run(StaticArrayAllocas, DynamicArrayAllocas,
 						 StackRestorePoints, Returns, true);
-		externStack->run(StaticHousedAllocas, DynamicHousedAllocas,
-						 StackRestorePoints, Returns, false);
+		//externStack->run(StaticHousedAllocas, DynamicHousedAllocas,
+		//				 StackRestorePoints, Returns, false);
 	}
 	return foundMovable;
 }
 
 char RustSmartPointerIsolationPass::ID = 0;
 
-INITIALIZE_PASS(RustSmartPointerIsolationPass, "rust-smart-pointer-isolation", "Rust Smart Pointer Isolation Pass", false, false)
+INITIALIZE_PASS(RustSmartPointerIsolationPass, "metaupdate-stacks", "Rust Smart Pointer Isolation Pass", false, false)
 
 FunctionPass *llvm::createRustSmartPointerIsolationPass() {
 	return new RustSmartPointerIsolationPass();
