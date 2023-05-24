@@ -615,6 +615,7 @@ bool MetaSafeStack::run() {
   return true;
 }
 
+namespace llvm {
 class MetaSafeStackLegacyPass : public FunctionPass {
   const TargetMachine *TM = nullptr;
 
@@ -684,6 +685,7 @@ public:
         .run();
   }
 };
+} //llvm
 
 } // end anonymous namespace
 
