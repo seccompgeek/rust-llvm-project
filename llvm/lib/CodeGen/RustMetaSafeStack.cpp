@@ -647,7 +647,7 @@ FunctionPass *llvm::createMetaSafeStackPass() { return new MetaSafeStackLegacyPa
 PreservedAnalyses MetaSafeStackPass::run(Function &F, FunctionAnalysisManager &FAM){
   if(llvm::createMetaSafeStackPass()->runOnFunction(F)){
     PreservedAnalyses preseved;
-    preserved.preserve<>();
+    preserved.preserve<DominatorTreeAnalysis>();
     return preserved;
   }else{
     return PreservedAnalyses::all();
