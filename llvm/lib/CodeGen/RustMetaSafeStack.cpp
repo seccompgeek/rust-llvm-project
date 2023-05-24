@@ -96,6 +96,7 @@ class MetaSafeStack {
   Type *Int8Ty;
 
   Value *UnsafeStackPtr = nullptr;
+  Value *HouseStackPtr = nullptr;
 
   /// Unsafe stack alignment. Each stack frame must ensure that the stack is
   /// aligned to this value. We need to re-align the unsafe stack if the
@@ -129,9 +130,7 @@ class MetaSafeStack {
   /// allocas are allocated.
   Value *moveStaticAllocasToUnsafeStack(IRBuilder<> &IRB, Function &F,
                                         ArrayRef<AllocaInst *> StaticAllocas,
-                                        ArrayRef<Argument *> ByValArguments,
-                                        Instruction *BasePointer,
-                                        AllocaInst *StackGuardSlot);
+                                        Instruction *BasePointer);
 
   /// Generate code to restore the stack after all stack restore points
   /// in \p StackRestorePoints.
@@ -316,7 +315,6 @@ MetaSafeStack::createStackRestorePoints(IRBuilder<> &IRB, Function &F,
 
   // Restore current stack pointer after longjmp/exception catch.
   for (Instruction *I : StackRestorePoints) {
-    ++NumUnsafeStackRestorePoints;
 
     IRB.SetInsertPoint(I->getNextNode());
     Value *CurrentTop =
