@@ -951,8 +951,7 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
 }
 
 LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
-  return wrap(unwrap<Instruction>(Val));
-  /*
+
   uint64_t stackMask = ~((uint64_t)0x7FFFFF);
   uint64_t segmentMask = (uint64_t)0xFFFFFFFFFE000000;
   uint64_t lowerAddrOffsetMask = ~((uint64_t) segmentMask);
@@ -961,17 +960,17 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   static std::map<Instruction*, Instruction*> Address2PhiMap;
   if(Address2PhiMap.find(Address) != Address2PhiMap.end()){
     return wrap(Address2PhiMap[Address]);
-  }*/
+  }
 
-  /*auto &context = Address->getContext();
+  auto &context = Address->getContext();
   BasicBlock* originalBlock = Address->getParent();
   Value* MaskValue = ConstantInt::get(Type::getInt64Ty(context), stackMask);
-  IRBuilder<> IRB(Address->getNextNode());
+  IRBuilder<> IRB(originalBlock);
   Value* AddrToInt = IRB.CreatePtrToInt(Address, Type::getInt64Ty(context));
   Value* MaskedAddr = IRB.CreateAnd({AddrToInt, MaskValue});
   Function* currentFunction = originalBlock->getParent();
   //read RSP
-  ///
+  /*///
   std::vector<Type *> arg_type;
   std::vector<Value *> args;
   MDNode *N = MDNode::get(context, {MDString::get(context, "rsp")});
