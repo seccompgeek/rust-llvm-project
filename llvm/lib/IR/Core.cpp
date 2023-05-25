@@ -969,7 +969,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   Value* AddrToInt = IRB.CreatePtrToInt(Address, Type::getInt64Ty(context));
   Value* MaskedAddr = IRB.CreateAnd({AddrToInt, MaskValue});
   Value* dummy = IRB.CreateBitCast(MaskedAddr, Address->getType());
-  Address2PhiMap.insert(std::make_pair(Address, dummy));
+  Address2PhiMap.insert(std::make_pair(Address, (Instruction*)dummy));
   return wrap(dummy);
   //Function* currentFunction = originalBlock->getParent();
   //read RSP
