@@ -316,6 +316,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 						 bool isPure)
 {
 	IRBuilder<> IRB(&F.front(), F.begin()->getFirstInsertionPt());
+	
 	/*
 	if (DISubprogram *SP = F.getSubprogram())
 		IRB.SetCurrentDebugLocation(DebugLoc::get(SP->getScopeLine(), 0, SP));
@@ -337,6 +338,10 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	
 	LLVMContext &C = F.getContext();
 	std::vector<Value *> args;
+
+	FunctionCallee Checks = F.getParent()->getOrInsertFunction(
+		"check_fs", Type::getVoidTy(C));
+	IRB.CreateCall(Checks);
 
 	StringRef asmCode = "movq %fs:${1:c}, $0";
 	StringRef constraints = "=r,i,~{dirflag},~{fpsr},~{flags}";
@@ -373,14 +378,11 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	moveDynamicAllocasToExternStack(F, *ExternStackPtr, DynamicTop,
 									DynamicAllocas);
 
-	FunctionCallee Checks = F.getParent()->getOrInsertFunction(
-		"check_fs", Type::getVoidTy(C));
 
 	for (ReturnInst *RI : Returns)
 	{
 		IRB.SetInsertPoint(RI);
 		IRB.CreateStore(BasePtr, *ExternStackPtr);
-		IRB.CreateCall(Checks);	
 	}
 	
 }
