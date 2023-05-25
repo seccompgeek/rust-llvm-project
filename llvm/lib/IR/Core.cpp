@@ -961,7 +961,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
     return wrap(Address2PhiMap[Address]);
   }
 
-  auto &context = Address->getContext();
+  /*auto &context = Address->getContext();
   BasicBlock* originalBlock = Address->getParent();
   Value* MaskValue = ConstantInt::get(Type::getInt64Ty(context), stackMask);
   IRBuilder<> IRB(Address->getNextNode());
@@ -970,7 +970,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   Function* currentFunction = originalBlock->getParent();
   //read RSP
   ///
-  /*std::vector<Type *> arg_type;
+  std::vector<Type *> arg_type;
   std::vector<Value *> args;
   MDNode *N = MDNode::get(context, {MDString::get(context, "rsp")});
   arg_type.push_back(Type::getInt64Ty(context));
@@ -1024,7 +1024,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   phiNode->addIncoming(OptLoadAddress, ElseBlock);
   Address2PhiMap.insert(std::make_pair(Address, phiNode));
   return wrap(phiNode);*/
-  return wrap(Address);
+  return wrap<Value>(Address);
 }
 
 void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn){
