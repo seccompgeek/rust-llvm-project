@@ -954,7 +954,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   uint64_t stackMask = ~((uint64_t)0x7FFFFF);
   uint64_t segmentMask = (uint64_t)0xFFFFFFFFFE000000;
   uint64_t lowerAddrOffsetMask = ~((uint64_t) segmentMask);
-  Instruction* Address = unwrap<Instruction*>(Val);
+  Instruction* Address = unwrap<Instruction>(Val);
 
   static std::map<Instruction*, Instruction*> Address2PhiMap;
   if(Address2PhiMap.find(Address) != Address2PhiMap.end()){
