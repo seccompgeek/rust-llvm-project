@@ -967,7 +967,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   IRBuilder<> IRB(Address->getNextNode());
   Value* AddrToInt = IRB.CreatePtrToInt(Address, Type::getInt64Ty(context));
   Value* MaskedAddr = IRB.CreateAnd({AddrToInt, MaskValue});
-
+  Function* currentFunction = originalBlock->getParent();
   //read RSP
   ///
   std::vector<Type *> arg_type;
@@ -985,7 +985,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   Value* Zero = ConstantInt::get(Type::getInt64Ty(context), 0);
   Value* Condition = IRB.CreateCmp(CmpInst::Predicate::ICMP_EQ, Zero, XORed, "is_stack_ptr");
 
-  Function* currentFunction = originalBlock->getParent();
+
   BasicBlock* ThenBlock = BasicBlock::Create(context, "then", currentFunction);
   BasicBlock* ElseBlock = BasicBlock::Create(context, "else");
   BasicBlock* MergeBlock = BasicBlock::Create(context, "ifcont");
@@ -1004,8 +1004,8 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   currentFunction->insert(currentFunction->end(), ElseBlock);
   IRB.SetInsertPoint(ElseBlock);
 
-  Value* segmentPtr = IRB.CreateAdd(std::vector<Value*>({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1)}));
-  segmentPtr = IRB.CreateAnd(std::vector<Value*>({segmentPtr, ConstantInt::get(Type::getInt64Ty(context), segmentMask)})));
+  Value* segmentPtr = IRB.CreateAdd(AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1));
+  segmentPtr = IRB.CreateAnd(std::vector<Value*>({segmentPtr, ConstantInt::get(Type::getInt64Ty(context), segmentMask)}));
   segmentPtr = IRB.CreateIntToPtr(segmentPtr, Type::getInt8PtrTy(context)->getPointerTo(0));
   Value* shadowAddr = IRB.CreateLoad(Type::getInt8PtrTy(context), segmentPtr, "shadow_address");
   Value* shadowAddrInt = IRB.CreatePtrToInt(shadowAddr, Type::getInt64Ty(context));
