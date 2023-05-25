@@ -1001,7 +1001,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
 
   ThenBlock = IRB.GetInsertBlock();
 
-  currentFunction->insert(currentFunction->end(), ElseBlock);
+  currentFunction->getBasicBlockList().push_back(ElseBlock);
   IRB.SetInsertPoint(ElseBlock);
 
   Value* segmentPtr = IRB.CreateAdd(AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1));
@@ -1017,7 +1017,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
 
   ElseBlock = IRB.GetInsertBlock();
 
-  currentFunction->insert(currentFunction->end(), MergeBlock);
+  currentFunction->getBasicBlockList().push_back(MergeBlock);
   IRB.SetInsertPoint(MergeBlock);
   PHINode* phiNode = IRB.CreatePHI(Address->getType(),2,"cast_safe_address");
   phiNode->addIncoming(LoadAddress, ThenBlock);
