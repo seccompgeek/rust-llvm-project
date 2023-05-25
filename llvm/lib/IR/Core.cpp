@@ -1024,7 +1024,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   phiNode->addIncoming(OptLoadAddress, ElseBlock);
   Address2PhiMap.insert(std::make_pair(Address, phiNode));
   return wrap(phiNode);*/
-  return Address;
+  return wrap(Address);
 }
 
 void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn){
