@@ -951,7 +951,7 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
 }
 
 LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
-  return wrap<Value>(unwrap<Instruction>(val));
+  return wrap<Value>(unwrap<Instruction>(Val));
   /*
   uint64_t stackMask = ~((uint64_t)0x7FFFFF);
   uint64_t segmentMask = (uint64_t)0xFFFFFFFFFE000000;
