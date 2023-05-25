@@ -972,13 +972,12 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   ///
   std::vector<Type *> arg_type;
   std::vector<Value *> args;
-  LLVMContext &C = F.getContext();
-  MDNode *N = MDNode::get(C, {MDString::get(C, "rsp")});
-  arg_type.push_back(Type::getInt64Ty(C));
+  MDNode *N = MDNode::get(context, {MDString::get(context, "rsp")});
+  arg_type.push_back(Type::getInt64Ty(context));
   Function *readRSPFunc = Intrinsic::getDeclaration(
       F.getParent(), Intrinsic::read_register, arg_type);
-  args.push_back(MetadataAsValue::get(C, N));
-  Value *StackPtr = IRB.CreateCall(readRegisterFunc, args);
+  args.push_back(MetadataAsValue::get(context, N));
+  Value *StackPtr = IRB.CreateCall(readRSPFunc, args);
 
   Value* MaskedStackPtr = IRB.CreateAnd(StackPtr, MaskValue);
   Value* XORed = IRB.CreateXor(MaskedStackPtr, MaskedAddr);
