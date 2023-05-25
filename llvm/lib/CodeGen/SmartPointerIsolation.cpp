@@ -373,10 +373,14 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	moveDynamicAllocasToExternStack(F, *ExternStackPtr, DynamicTop,
 									DynamicAllocas);
 
+	FunctionCallee Checks = F.getParent()->getOrInsertFunction(
+		"check_fs", Type::getVoidTy(C));
+
 	for (ReturnInst *RI : Returns)
 	{
 		IRB.SetInsertPoint(RI);
 		IRB.CreateStore(BasePtr, *ExternStackPtr);
+		IRB.CreateCall(Checks);	
 	}
 	
 }
@@ -452,6 +456,8 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		
 		CallInst *MEM2FS = IRB.CreateCall(inlineAsm, args);
 		MEM2FS->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);
+
+		//IRB.SetInsertPoint()
 
 		return true;
 	}
