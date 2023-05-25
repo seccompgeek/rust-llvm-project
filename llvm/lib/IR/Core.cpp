@@ -978,7 +978,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
       currentFunction->getParent(), Intrinsic::read_register, arg_type);
   args.push_back(MetadataAsValue::get(context, N));
   Value *StackPtr = IRB.CreateCall(readRSPFunc, args);
-
+/*
   Value* MaskedStackPtr = IRB.CreateAnd(StackPtr, MaskValue);
   Value* XORed = IRB.CreateXor(MaskedStackPtr, MaskedAddr);
 
@@ -1023,7 +1023,8 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   phiNode->addIncoming(LoadAddress, ThenBlock);
   phiNode->addIncoming(OptLoadAddress, ElseBlock);
   Address2PhiMap.insert(std::make_pair(Address, phiNode));
-  return wrap(phiNode);
+  return wrap(phiNode);*/
+  return Address;
 }
 
 void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn){
