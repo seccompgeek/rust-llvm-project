@@ -178,7 +178,6 @@ add_llvm_component_library(LLVMCodeGen
   RegisterScavenging.cpp
   RemoveRedundantDebugValues.cpp
   RenameIndependentSubregs.cpp
-  RustMetaSafeStack.cpp
   MachineStableHash.cpp
   MIRVRegNamerUtils.cpp
   MIRNamerPass.cpp

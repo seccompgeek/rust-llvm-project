@@ -382,7 +382,6 @@ void initializeSCEVAAWrapperPassPass(PassRegistry&);
 void initializeSLPVectorizerPass(PassRegistry&);
 void initializeSROALegacyPassPass(PassRegistry&);
 void initializeSafeStackLegacyPassPass(PassRegistry&);
-void initializeMetaSafeStackLegacyPassPass(PassRegistry&);
 void initializeSafepointIRVerifierPass(PassRegistry&);
 void initializeSelectOptimizePass(PassRegistry &);
 void initializeScalarEvolutionWrapperPassPass(PassRegistry&);

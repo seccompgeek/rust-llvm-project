@@ -1010,7 +1010,6 @@ void TargetPassConfig::addISelPrepare() {
   // only protect functions that have corresponding attributes.
   addPass(createSafeStackPass());
   addPass(createStackProtectorPass());
-  addPass(createMetaSafeStackPass());
 
   if (PrintISelInput)
     addPass(createPrintFunctionPass(
