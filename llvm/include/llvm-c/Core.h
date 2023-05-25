@@ -2455,6 +2455,10 @@ void LLVMDeleteFunction(LLVMValueRef Fn);
  * Set smart pointer metadata on alloca instructions: SORLAB: @kayondomartin
  */
 void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca);
+/*
+* get a projection of a smart pointer
+*/
+LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val);
 /**
  * @brief store a value in the TDI index
 */

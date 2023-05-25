@@ -37,10 +37,12 @@
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <system_error>
 #include <map>
+#include <vector>
 
 using namespace llvm;
 
@@ -946,6 +948,83 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   auto TDISlot = cast<GlobalVariable>(module->getOrInsertGlobal("_mi_tdi_index", Type::getInt64Ty(context)));
   TDISlot->setThreadLocal(true);
   Builder.CreateStore(Index, TDISlot, true);
+}
+
+LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
+  uint64_t stackMask = ~((uint64_t)0x7FFFFF);
+  uint64_t segmentMask = (uint64_t)0xFFFFFFFFFE000000;
+  uint64_t lowerAddrOffsetMask = ~((uint64_t) segmentMask);
+  Instruction* Address = unwrap<Instruction*>(Val);
+
+  static std::map<Instruction*, Instruction*> Address2PhiMap;
+  if(Address2PhiMap.find(Address) != Address2PhiMap.end()){
+    return wrap(Address2PhiMap[Address]);
+  }
+
+  auto &context = Address->getContext();
+  BasicBlock* originalBlock = Address->getParent();
+  Value* MaskValue = ConstantInt::get(Type::getInt64Ty(context), stackMask);
+  IRBuilder<> IRB(Address->getNextNode());
+  Value* AddrToInt = IRB.CreatePtrToInt(Address, Type::getInt64Ty(context));
+  Value* MaskedAddr = IRB.CreateAnd({AddrToInt, MaskValue});
+
+  //read RSP
+  ///
+  std::vector<Type *> arg_type;
+  std::vector<Value *> args;
+  LLVMContext &C = F.getContext();
+  MDNode *N = MDNode::get(C, {MDString::get(C, "rsp")});
+  arg_type.push_back(Type::getInt64Ty(C));
+  Function *readRSPFunc = Intrinsic::getDeclaration(
+      F.getParent(), Intrinsic::read_register, arg_type);
+  args.push_back(MetadataAsValue::get(C, N));
+  Value *StackPtr = IRB.CreateCall(readRegisterFunc, args);
+
+  Value* MaskedStackPtr = IRB.CreateAnd(StackPtr, MaskValue);
+  Value* XORed = IRB.CreateXor(MaskedStackPtr, MaskedAddr);
+
+  Value* Zero = ConstantInt::get(Type::getInt64Ty(context), 0);
+  Value* Condition = IRB.CreateCmp(CmpInst::Predicate::ICMP_EQ, Zero, XORed, "is_stack_ptr");
+
+  Function* currentFunction = originalBlock->getParent();
+  BasicBlock* ThenBlock = BasicBlock::Create(context, "then", currentFunction);
+  BasicBlock* ElseBlock = BasicBlock::Create(context, "else");
+  BasicBlock* MergeBlock = BasicBlock::Create(context, "ifcont");
+
+  Value* Branch = IRB.CreateCondBr(Condition, ThenBlock, ElseBlock);
+
+  IRB.SetInsertPoint(ThenBlock);
+  //This was on the stack! so mask accordingly!
+  Value* dummyMask = IRB.CreateAnd({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1)});
+  Value* LoadAddress = IRB.CreateIntToPtr(dummyMask, Type::getInt8PtrTy(context));
+  LoadAddress = IRB.CreateBitCast(LoadAddress, Address->getType());
+  IRB.CreateBr(MergeBlock);
+
+  ThenBlock = IRB.GetInsertBlock();
+
+  currentFunction->insert(currentFunction->end(), ElseBlock);
+  IRB.SetInsertPoint(ElseBlock);
+
+  Value* segmentPtr = IRB.CreateAdd({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1)});
+  segmentPtr = IRB.CreateAnd({segmentPtr, ConstantInt::get(Type::getInt64Ty(context), segmentMask)});
+  segmentPtr = IRB.CreateIntToPtr(segmentPtr, Type::getInt8PtrTy(context)->getPointerTo(0));
+  Value* shadowAddr = IRB.CreateLoad(Type::getInt8PtrTy(context), segmentPtr, "shadow_address");
+  Value* shadowAddrInt = IRB.CreatePtrToInt(shadowAddr, Type::getInt64Ty(context));
+  Value* addressLower = IRB.CreateAnd({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), lowerAddrOffsetMask)});
+  Value* OptLoadAddress = IRB.CreateOr({shadowAddrInt, addressLower});
+  OptLoadAddress = IRB.CreateIntToPtr(OptLoadAddress, Type::getInt8PtrTy(context));
+  OptLoadAddress = IRB.CreateBitCast(OptLoadAddress, Address->getType());
+  IRB.CreateBr(MergeBlock);
+
+  ElseBlock = IRB.GetInsertBlock();
+
+  currentFunction->insert(currentFunction->end(), MergeBlock);
+  IRB.SetInsertPoint(MergeBlock);
+  PHINode* phiNode = IRB.CreatePHI(Address->getType(),2,"cast_safe_address");
+  phiNode->addIncoming(LoadAddress, ThenBlock);
+  phiNode->addIncoming(OptLoadAddress, ElseBlock);
+  Address2PhiMap.insert(std::make_pair(Address, phiNode));
+  return wrap(phiNode);
 }
 
 void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn){
