@@ -975,7 +975,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   MDNode *N = MDNode::get(context, {MDString::get(context, "rsp")});
   arg_type.push_back(Type::getInt64Ty(context));
   Function *readRSPFunc = Intrinsic::getDeclaration(
-      F.getParent(), Intrinsic::read_register, arg_type);
+      currentFunction.getParent(), Intrinsic::read_register, arg_type);
   args.push_back(MetadataAsValue::get(context, N));
   Value *StackPtr = IRB.CreateCall(readRSPFunc, args);
 
@@ -994,7 +994,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
 
   IRB.SetInsertPoint(ThenBlock);
   //This was on the stack! so mask accordingly!
-  Value* dummyMask = IRB.CreateAnd({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1)});
+  Value* dummyMask = IRB.CreateAnd(std::vector({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1)}));
   Value* LoadAddress = IRB.CreateIntToPtr(dummyMask, Type::getInt8PtrTy(context));
   LoadAddress = IRB.CreateBitCast(LoadAddress, Address->getType());
   IRB.CreateBr(MergeBlock);
@@ -1004,13 +1004,13 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   currentFunction->insert(currentFunction->end(), ElseBlock);
   IRB.SetInsertPoint(ElseBlock);
 
-  Value* segmentPtr = IRB.CreateAdd({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1)});
-  segmentPtr = IRB.CreateAnd({segmentPtr, ConstantInt::get(Type::getInt64Ty(context), segmentMask)});
+  Value* segmentPtr = IRB.CreateAdd(std::vector({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), -1)}));
+  segmentPtr = IRB.CreateAnd(std::vector({segmentPtr, ConstantInt::get(Type::getInt64Ty(context), segmentMask)})));
   segmentPtr = IRB.CreateIntToPtr(segmentPtr, Type::getInt8PtrTy(context)->getPointerTo(0));
   Value* shadowAddr = IRB.CreateLoad(Type::getInt8PtrTy(context), segmentPtr, "shadow_address");
   Value* shadowAddrInt = IRB.CreatePtrToInt(shadowAddr, Type::getInt64Ty(context));
-  Value* addressLower = IRB.CreateAnd({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), lowerAddrOffsetMask)});
-  Value* OptLoadAddress = IRB.CreateOr({shadowAddrInt, addressLower});
+  Value* addressLower = IRB.CreateAnd(std::vector({AddrToInt, ConstantInt::get(Type::getInt64Ty(context), lowerAddrOffsetMask)}));
+  Value* OptLoadAddress = IRB.CreateOr(std::vector({shadowAddrInt, addressLower}));
   OptLoadAddress = IRB.CreateIntToPtr(OptLoadAddress, Type::getInt8PtrTy(context));
   OptLoadAddress = IRB.CreateBitCast(OptLoadAddress, Address->getType());
   IRB.CreateBr(MergeBlock);
