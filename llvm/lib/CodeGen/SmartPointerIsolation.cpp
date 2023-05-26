@@ -339,9 +339,9 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	LLVMContext &C = F.getContext();
 	std::vector<Value *> args;
 	
-	FunctionCallee Fn = F.getParent()->getOrInsertFunction(
+	/*FunctionCallee Fn = F.getParent()->getOrInsertFunction(
 			"__get_wrapper", StackPtrTy);
-	IRB.CreateCall(Fn);
+	IRB.CreateCall(Fn);*/
 
 	/*FunctionCallee Checks = F.getParent()->getOrInsertFunction(
 		"check_fs", Type::getVoidTy(C));
@@ -444,7 +444,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		
 		std::vector<Value *> args;
 
-		/*StringRef asmCode = "movq $0, %fs:${1:c}";
+		StringRef asmCode = "movq $0, %fs:${1:c}";
 		StringRef constraints = "r,i,~{dirflag},~{fpsr},~{flags}";
 
 		InlineAsm* inlineAsm = InlineAsm::get(
@@ -457,7 +457,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		
 		CallInst *MEM2FS = IRB.CreateCall(inlineAsm, args);
 		MEM2FS->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);
-*/
+
 		//IRB.SetInsertPoint()
 
 		return true;
