@@ -2459,6 +2459,10 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca);
 * get a projection of a smart pointer
 */
 LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val);
+/*
+* copy debug location
+*/
+void LLVMCopyDebugLocation(LLVMValueRef Val, LLVMBuilderRef Builder);
 /**
  * @brief read the stack pointer
 */
