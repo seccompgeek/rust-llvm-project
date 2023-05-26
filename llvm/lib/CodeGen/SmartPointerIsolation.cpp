@@ -341,7 +341,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	
 	FunctionCallee Fn = F.getParent()->getOrInsertFunction(
 			"__get_wrapper", StackPtrTy);
-	Value *ExternStackPtr = IRB.CreateCall(Fn);
+	IRB.CreateCall(Fn);
 
 	FunctionCallee test_print = F.getParent()->getOrInsertFunction(
 		"test_print_test", Type::getVoidTy(C));
