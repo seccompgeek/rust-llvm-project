@@ -916,7 +916,8 @@ void LLVMSetSmartPointerMetadata(LLVMValueRef Alloca) {
 void LLVMCopyDebugLocation(LLVMValueRef Val, LLVMBuilderRef Builder) {
   Instruction* inst = unwrap<Instruction>(Val);
   auto dl = inst->getDebugLoc();
-  unwrap(Builder)->SetCurrentDebugLocation(dl);
+  if(dl)
+    unwrap(Builder)->SetCurrentDebugLocation(dl);
 }
 
 void LLVMSetSmartPointerHouseMetadata(LLVMValueRef Alloca){
