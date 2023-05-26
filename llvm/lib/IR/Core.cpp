@@ -950,6 +950,23 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   Builder.CreateStore(Index, TDISlot, true);
 }
 
+LLVMValueRef LLVMReadStackPtr(LLVMBasicBlockRef Block, LLVMValueRef Func) {
+  auto BB = unwrap<BasicBlock>(Block);
+  auto currentFunction = unwrap<Function>(Func);
+  auto &context = currentFunction->getContext();
+
+  IRBuilder<> IRB(BB);
+  std::vector<Type *> arg_type;
+  std::vector<Value *> args;
+  MDNode *N = MDNode::get(context, {MDString::get(context, "rsp")});
+  arg_type.push_back(Type::getInt64Ty(context));
+  Function *readRSPFunc = Intrinsic::getDeclaration(
+      currentFunction->getParent(), Intrinsic::read_register, arg_type);
+  args.push_back(MetadataAsValue::get(context, N));
+  Value *StackPtr = IRB.CreateCall(readRSPFunc, args);
+  return wrap(StackPtr);
+}
+
 LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
 
   uint64_t stackMask = ~((uint64_t)0x7FFFFF);
@@ -973,8 +990,8 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val) {
   return wrap(dummy);
   //Function* currentFunction = originalBlock->getParent();
   //read RSP
-  /*///
-  std::vector<Type *> arg_type;
+  ///
+  /*std::vector<Type *> arg_type;
   std::vector<Value *> args;
   MDNode *N = MDNode::get(context, {MDString::get(context, "rsp")});
   arg_type.push_back(Type::getInt64Ty(context));
