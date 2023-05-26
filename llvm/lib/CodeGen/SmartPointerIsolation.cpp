@@ -368,32 +368,29 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 
 	*ExternStackPtr =
 		IRB.CreateBitCast(ExternStackPointer, StackPtrTy->getPointerTo(0));
-	IRB.CreateCall(test_print);
+	//IRB.CreateCall(test_print);
 	if(!isPure){
 		*ExternStackPtr = cast<Instruction>(IRB.CreateGEP(Type::getInt8Ty(C), *ExternStackPtr, ConstantInt::get(Int32Ty, 8)));		
 	}
 	
 	Instruction *BasePtr = IRB.CreateLoad(StackPtrTy, *ExternStackPtr, false, name);
-	IRB.CreateCall(test_print);
+	//IRB.CreateCall(test_print);
 	Value *StaticTop = moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr, *ExternStackPtr, isPure);
-	IRB.CreateCall(test_print);
+	//IRB.CreateCall(test_print);
 	//IRB.SetInsertPoint(cast<Instruction>(PureTop)->getNextNode());
 	//IRB.CreateStore(StaticTop, PureExternStackPtr);
 	AllocaInst *DynamicTop = createStackRestorePoints(
 		IRB, F, StackRestorePoints, StaticTop, *ExternStackPtr,!DynamicAllocas.empty(), isPure);
-	IRB.CreateCall(test_print);
+	//IRB.CreateCall(test_print);
 
 	moveDynamicAllocasToExternStack(F, *ExternStackPtr, DynamicTop,
 									DynamicAllocas);
 	
-//	FunctionCallee test_print = F.getParent()->getOrInsertFunction(
-//		"test_print_test", Type::getVoidTy(C));
 
 	for (ReturnInst *RI : Returns)
 	{
 		IRB.SetInsertPoint(RI);
 		IRB.CreateStore(BasePtr, *ExternStackPtr);
-		IRB.CreateCall(test_print);
 	}
 	
 }
