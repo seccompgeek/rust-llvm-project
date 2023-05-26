@@ -359,7 +359,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	Value *ExternStackPointer = IRB.CreateIntToPtr(FS2MEM, Type::getInt64PtrTy(C));
 
 	Type *int64Ptr = Type::getInt64PtrTy(C);
-	ExternStackPointer = IRB.CreateIntToPtr(ExternStackPointer, int64Ptr);
+	//ExternStackPointer = IRB.CreateIntToPtr(ExternStackPointer, int64Ptr);
 	ExternStackPointer = IRB.CreateBitCast(ExternStackPointer, int64Ptr->getPointerTo(0));
 
 	*ExternStackPtr =
@@ -377,12 +377,15 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 
 	moveDynamicAllocasToExternStack(F, *ExternStackPtr, DynamicTop,
 									DynamicAllocas);
-
+	
+	FunctionCallee test_print = F.getParent()->getOrInsertFunction(
+		"test_print_test", Type::getVoidTy(C));
 
 	for (ReturnInst *RI : Returns)
 	{
 		IRB.SetInsertPoint(RI);
 		IRB.CreateStore(BasePtr, *ExternStackPtr);
+		IRB.CreateCall(test_print);
 	}
 	
 }
