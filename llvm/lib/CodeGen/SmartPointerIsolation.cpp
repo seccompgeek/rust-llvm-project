@@ -339,6 +339,9 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	LLVMContext &C = F.getContext();
 	std::vector<Value *> args;
 
+	FunctionCallee test_print = F.getParent()->getOrInsertFunction(
+		"test_print_test", Type::getVoidTy(C));
+
 	FunctionCallee Checks = F.getParent()->getOrInsertFunction(
 		"check_fs", Type::getVoidTy(C));
 	IRB.CreateCall(Checks);
@@ -361,25 +364,30 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	Type *int64Ptr = Type::getInt64PtrTy(C);
 	//ExternStackPointer = IRB.CreateIntToPtr(ExternStackPointer, int64Ptr);
 	ExternStackPointer = IRB.CreateBitCast(ExternStackPointer, int64Ptr->getPointerTo(0));
+	IRB.CreateCall(test_print);
 
 	*ExternStackPtr =
 		IRB.CreateBitCast(ExternStackPointer, StackPtrTy->getPointerTo(0));
+	IRB.CreateCall(test_print);
 	if(!isPure){
 		*ExternStackPtr = cast<Instruction>(IRB.CreateGEP(Type::getInt8Ty(C), *ExternStackPtr, ConstantInt::get(Int32Ty, 8)));		
 	}
 	
 	Instruction *BasePtr = IRB.CreateLoad(StackPtrTy, *ExternStackPtr, false, name);
+	IRB.CreateCall(test_print);
 	Value *StaticTop = moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr, *ExternStackPtr, isPure);
+	IRB.CreateCall(test_print);
 	//IRB.SetInsertPoint(cast<Instruction>(PureTop)->getNextNode());
 	//IRB.CreateStore(StaticTop, PureExternStackPtr);
 	AllocaInst *DynamicTop = createStackRestorePoints(
 		IRB, F, StackRestorePoints, StaticTop, *ExternStackPtr,!DynamicAllocas.empty(), isPure);
+	IRB.CreateCall(test_print);
 
 	moveDynamicAllocasToExternStack(F, *ExternStackPtr, DynamicTop,
 									DynamicAllocas);
 	
-	FunctionCallee test_print = F.getParent()->getOrInsertFunction(
-		"test_print_test", Type::getVoidTy(C));
+//	FunctionCallee test_print = F.getParent()->getOrInsertFunction(
+//		"test_print_test", Type::getVoidTy(C));
 
 	for (ReturnInst *RI : Returns)
 	{
