@@ -950,7 +950,7 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   Builder.CreateStore(Index, TDISlot, true);
 }
 
-LLVMValueRef LLVMReadStackPtr(LLVMBasicBlockRef Block, LLVMValueRef Func) {
+LLVMValueRef LLVMReadStackPtr(LLVMValueRef Block, LLVMValueRef Func) {
   auto BB = unwrap<BasicBlock>(Block);
   auto currentFunction = unwrap<Function>(Func);
   auto &context = currentFunction->getContext();
