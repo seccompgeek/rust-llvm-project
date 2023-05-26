@@ -364,7 +364,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	Type *int64Ptr = Type::getInt64PtrTy(C);
 	//ExternStackPointer = IRB.CreateIntToPtr(ExternStackPointer, int64Ptr);
 	ExternStackPointer = IRB.CreateBitCast(ExternStackPointer, int64Ptr->getPointerTo(0));
-	IRB.CreateCall(test_print);
+	//IRB.CreateCall(test_print);
 
 	*ExternStackPtr =
 		IRB.CreateBitCast(ExternStackPointer, StackPtrTy->getPointerTo(0));
@@ -376,7 +376,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	Instruction *BasePtr = IRB.CreateLoad(StackPtrTy, *ExternStackPtr, false, name);
 	//IRB.CreateCall(test_print);
 	Value *StaticTop = moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr, *ExternStackPtr, isPure);
-	//IRB.CreateCall(test_print);
+	IRB.CreateCall(test_print);
 	//IRB.SetInsertPoint(cast<Instruction>(PureTop)->getNextNode());
 	//IRB.CreateStore(StaticTop, PureExternStackPtr);
 	AllocaInst *DynamicTop = createStackRestorePoints(
