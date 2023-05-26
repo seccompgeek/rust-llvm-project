@@ -951,7 +951,7 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
 }
 
 LLVMValueRef LLVMReadStackPtr(LLVMBasicBlockRef Block, LLVMValueRef Func) {
-  BasicBlock *BB = unwrap<BasicBlock>(Block);
+  BasicBlock *BB = unwrap(Block);
   Function* currentFunction = unwrap<Function>(Func);
   auto &context = currentFunction->getContext();
 
