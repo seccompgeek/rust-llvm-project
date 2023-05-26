@@ -950,9 +950,9 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   Builder.CreateStore(Index, TDISlot, true);
 }
 
-LLVMValueRef LLVMReadStackPtr(LLVMValueRef Block, LLVMValueRef Func) {
-  auto BB = unwrap<BasicBlock>(Block);
-  auto currentFunction = unwrap<Function>(Func);
+LLVMValueRef LLVMReadStackPtr(LLVMBasicBlockRef Block, LLVMValueRef Func) {
+  BasicBlock *BB = unwrap<BasicBlock>(Block);
+  Function* currentFunction = unwrap<Function>(Func);
   auto &context = currentFunction->getContext();
 
   IRBuilder<> IRB(BB);

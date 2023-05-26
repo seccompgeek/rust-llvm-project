@@ -2462,7 +2462,7 @@ LLVMValueRef LLVMRustMetaGetSmartPointerProjection(LLVMValueRef Val);
 /**
  * @brief read the stack pointer
 */
-LLVMValueRef LLVMReadStackPtr(LLVMValueRef Block, LLVMValueRef Func);
+LLVMValueRef LLVMReadStackPtr(LLVMBasicBlockRef Block, LLVMValueRef Func);
 
 /**
  * @brief store a value in the TDI index
