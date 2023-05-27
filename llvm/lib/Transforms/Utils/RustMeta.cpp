@@ -186,7 +186,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         Value *ICmp = IRB.CreateICmpEQ(Zero, XORed);
 
         
-        BasicBlock* ShadowBlock = originalBlock->splitBasicBlock(ICmp, "shadow_block");
+        BasicBlock* ShadowBlock = originalBlock->splitBasicBlock(cast<Instruction>(ICmp), "shadow_block");
         BasicBlock* ThenBlock = BasicBlock::Create(context, "shadow.maybe_stack", currentFunction);
         BasicBlock* ElseBlock = BasicBlock::Create(context, "shadow.maybe_heap");
         
