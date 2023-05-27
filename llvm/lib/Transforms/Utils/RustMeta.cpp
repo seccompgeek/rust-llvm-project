@@ -2,6 +2,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Dominators.h"
 #include <map>
 #include <vector>
 
@@ -14,8 +15,8 @@ std::string MetaUpdateSMAPIPass::typeToString(Type* type){
   return rso.str();
 }
 
-PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
-                                               ModuleAnalysisManager &AM) {
+PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
+                                               FunctionAnalysisManager &AM) {
 
   /*Find special types housed in normal structs and insert new structs to replace them
   auto structTypes = M.getIdentifiedStructTypes();
@@ -80,15 +81,22 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     }
   }*/
 
-  for (auto &Func: M){
+  if(Func.isDeclaration()) return PreservedAnalyses::all();
+
+
+  auto getDT = [&](Functoin& F) -> DominatorTree* {
+    return AM.getResult<DominatorTreeAnalysis>(F);
+  }
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
     std::map<Instruction*, size_t> candidateCallSites;
     std::set<Instruction*> externFuncCalls;
     std::set<Instruction*> unnecessaryStores;
     std::map<uint64_t, uint64_t> optimizedIndices;
 
-    std::map<Value*, Instruction*> SmartPtr2ShadowMap;
+    std::map<Value*, std::set<Instruction*>> SmartPtr2ShadowMap;
     std::set<Instruction*> SmartPtrProjections;
+
+    bool TDIAnalysis = !Func.getMetadata("SmartPointerAPIFunc");
 
     Instruction* getTDISlotInsertPoint = nullptr;
     bool Allocas = true;
@@ -98,70 +106,92 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
           Allocas = false;
           getTDISlotInsertPoint = &Inst;
         }
-        if(auto call = dyn_cast<CallBase>(&Inst)){
-          if(auto SMMD = call->getMetadata("ExchangeMallocCall")){
-            auto TypeID = cast<MDString>(SMMD->getOperand(0))->getString();
-            if(TypeID.equals("0")){
-              candidateCallSites.insert(std::make_pair(&Inst, 1));
-            }else{
-              auto it = TypeMetadataToTDIIndexMap.find(TypeID);
-              size_t TDIIndex = -1;
-              if(it == TypeMetadataToTDIIndexMap.end()){
-                TDIIndex = TypeMetadataToTDIIndexMap.size() + 2; //0 is for FFIs, 1 is for smart pointers
-                TypeMetadataToTDIIndexMap.insert(std::make_pair(TypeID, TDIIndex));
+
+        if(!TDIAnalysis){
+          if(auto call = dyn_cast<CallBase>(&Inst)){
+            if(auto SMMD = call->getMetadata("ExchangeMallocCall")){
+              auto TypeID = cast<MDString>(SMMD->getOperand(0))->getString();
+              if(TypeID.equals("0")){
+                candidateCallSites.insert(std::make_pair(&Inst, 1));
               }else{
-                TDIIndex = it->second;
+                auto it = TypeMetadataToTDIIndexMap.find(TypeID);
+                size_t TDIIndex = -1;
+                if(it == TypeMetadataToTDIIndexMap.end()){
+                  TDIIndex = TypeMetadataToTDIIndexMap.size() + 2; //0 is for FFIs, 1 is for smart pointers
+                  TypeMetadataToTDIIndexMap.insert(std::make_pair(TypeID, TDIIndex));
+                }else{
+                  TDIIndex = it->second;
+                }
+                candidateCallSites.insert(std::make_pair(&Inst, TDIIndex));
               }
-              candidateCallSites.insert(std::make_pair(&Inst, TDIIndex));
-            }
-          }else if(auto F = call->getCalledFunction()){
-            if(F->getMetadata("ExternFunc")){
-              externFuncCalls.insert(call);
+            }else if(auto F = call->getCalledFunction()){
+              if(F->getMetadata("ExternFunc")){
+                externFuncCalls.insert(call);
+              }
             }
           }
-        }else if (auto store = dyn_cast<StoreInst>(&Inst)){
-          auto dest = store->getPointerOperand();
-          if(auto TDIIndex = dyn_cast<GlobalVariable>(dest)){
-            if(TDIIndex->getName().equals("_mi_tdi_index")){
-              if(store->hasMetadata("noalias")){
-                unnecessaryStores.insert(store);
-                continue;
-              }
-              auto storedValue = dyn_cast<ConstantInt>(store->getValueOperand());
-              auto actualValue = storedValue->getZExtValue();
-              if(actualValue == 1){
-                continue;
-              }
-              if(optimizedIndices.find(actualValue) != optimizedIndices.end()){
-                store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), optimizedIndices[actualValue]));
-              } else{
-                optimizedIndices.insert(std::make_pair(actualValue, optimizedIndices.size()+2));
-                store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), optimizedIndices[actualValue]));
+        }
+        
+        if (auto store = dyn_cast<StoreInst>(&Inst)){
+            auto dest = store->getPointerOperand();
+            if(auto TDIIndex = dyn_cast<GlobalVariable>(dest)){
+              if(TDIIndex->getName().equals("_mi_tdi_index")){
+                if(store->hasMetadata("noalias")){
+                  unnecessaryStores.insert(store);
+                  continue;
+                }
+                auto storedValue = dyn_cast<ConstantInt>(store->getValueOperand());
+                auto actualValue = storedValue->getZExtValue();
+                if(actualValue == 1){
+                  continue;
+                }
+                if(optimizedIndices.find(actualValue) != optimizedIndices.end()){
+                  store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), optimizedIndices[actualValue]));
+                } else{
+                  optimizedIndices.insert(std::make_pair(actualValue, optimizedIndices.size()+2));
+                  store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), optimizedIndices[actualValue]));
+                }
               }
             }
           }
         } else if(auto Int2Ptr = dyn_cast<IntToPtrInst>(&Inst)){
           if(Int2Ptr->hasMetadata("FieldProjection")){
-            SmartPtrProjections.insert(Int2Ptr);
+            auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
+            auto Ptr2Int = cast<Instruction>(AndInst->getOperand(0));
+            auto OrigAddr = Ptr2Int->getOperand(0);
+            if(SmartPtr2ShadowMap.find(OrigAddr) != SmartPtr2ShadowMap.end()){
+              SmartPtr2ShadowMap[OrigAddr].insert(Int2Ptr);
+            }else{
+              std::set<Instruction*> set;
+              set.insert(Int2Ptr);
+              SmartPtr2ShadowMap.insert(std::make_pair(OrigAddr, set));
+            }
           }
         }
       }
     }
 
-    for(auto Int2Ptr: SmartPtrProjections){
-      errs()<<"Working on Int2Ptr: "<<*Int2Ptr;
-      errs()<<"AndInst"<<*(Int2Ptr->getOperand(0))<<"\n";
-      auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
-      errs()<<"Ptr2Int: "<<*(AndInst->getOperand(0))<<"\n";
-      auto Ptr2Int = cast<Instruction>(AndInst->getOperand(0));
-      auto OrigAddr = Ptr2Int->getOperand(0);
+    if(SmartPtr2ShadowMap.size() > 0){
+      auto DT = getDT(F);
+      for(auto it: SmartPtr2ShadowMap){
+        auto OrigAddr = it.first;
+        Instruction* dominator = nullptr;
+        for(auto inst: it.second){
+          if(dominator == nullptr){
+            dominator = inst;
+          }else{
+            auto dmBB = dominator->getParent();
+            auto instBB = inst->getParent();
+            if((dmBB == instBB && inst->getIterator() < dominator->getIterator()) || !DT->dominates(dominator, instBB)){
+              dominator = inst;
+            }
+          }
+        }
 
-      Instruction* replacement = nullptr;
-      if(SmartPtr2ShadowMap.find(OrigAddr) != SmartPtr2ShadowMap.end()){
-        replacement = SmartPtr2ShadowMap[OrigAddr];
-        errs()<<"Found prev replacement: "<<*OrigAddr<<": "<<*replacement<<"\n";
-      }else{
-        errs()<<"No prev replacement: "<<*OrigAddr<<"\n";
+        assert(dominator != nullptr && "Can't have a null dominator!");
+        auto Int2Ptr = dominator;
+        auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
+        auto Ptr2Int = cast<Instruction>(AndInst->getOperand(0));
         auto originalBlock = Int2Ptr->getParent();
         auto currentFunction = &Func;
         auto& context = Func.getContext();
@@ -222,12 +252,12 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         phiNode->addIncoming(StackShadowAddr, ThenBlock);
         phiNode->addIncoming(HeapShadowAddr, ElseBlock);
         SmartPtr2ShadowMap.insert(std::make_pair(OrigAddr, phiNode));
-        replacement = cast<Instruction>(phiNode);
+        
+        for(auto inst: it.second){
+          inst->replaceAllUsesWith(phiNode);
+          inst->eraseFromParent();
+        }
       }
-
-      errs()<<"replacing: "<<*Int2Ptr<<" with: "<<*replacement<<"\n";
-      Int2Ptr->replaceAllUsesWith(replacement);
-      Int2Ptr->eraseFromParent();
     }
 
     if(candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
@@ -278,6 +308,6 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         unstore->eraseFromParent();
       }
     }
-  }
+  
   return PreservedAnalyses::none();
 }

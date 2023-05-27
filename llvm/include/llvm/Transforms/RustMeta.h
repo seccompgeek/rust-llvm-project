@@ -12,7 +12,7 @@ class MetaUpdateSMAPIPass : public PassInfoMixin<MetaUpdateSMAPIPass> {
   std::string typeToString(Type* type);
 
 public:
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+  PreservedAnalyses run(Function &Func, FunctionAnalysisManager &AM);
 };
 
 } // namespace llvm
