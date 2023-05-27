@@ -176,7 +176,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
           }else{
             auto dmBB = dominator->getParent();
             auto instBB = inst->getParent();
-            if((dmBB == instBB && std::distance(dmBB->begin(),inst->getIterator()) < std::distance(dmBB->begin(), dominator->getIterator())) || !DT.dominates(dominator, instBB)){
+            if((dmBB == instBB && std::distance(dmBB->begin(),inst->getIterator()) < std::distance(dmBB->begin(), dominator->getIterator())) || !DT.dominates(dominator, inst)){
               dominator = inst;
             }
           }
