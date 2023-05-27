@@ -190,14 +190,14 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         Value *ICmp = IRB.CreateICmpEQ(Zero, XORed);
 
         errs()<<"splitting blocks\n";
-        BasicBlock* ShadowBlock = originalBlock->splitBasicBlock(cast<Instruction>(ICmp), "shadow_block");
+        BasicBlock* ShadowBlock = originalBlock->splitBasicBlockBefore(++(cast<Instruction>(ICmp)->getIterator()), "shadow_block");
         BasicBlock* ThenBlock = BasicBlock::Create(context, "shadow.maybe_stack", currentFunction, ShadowBlock);
         BasicBlock* ElseBlock = BasicBlock::Create(context, "shadow.maybe_heap", currentFunction, ShadowBlock);
 
         //currentFunction->getBasicBlockList().insertBefore(ShadowBlock, ThenBlock);
         //currentFunction->getBasicBlockList().insertBefore(ShadowBlock, ElseBlock);
         errs()<<"inserted new blocks\n";
-        Instruction* insertedBranch =&*(++(++cast<Instruction>(ICmp)->getIterator()));
+        Instruction* insertedBranch =&*(++(cast<Instruction>(ICmp)->getIterator()));
         errs()<<"Inserted branch: "<<*insertedBranch<<"\n";
         IRB.SetInsertPoint(insertedBranch);
         IRB.CreateCondBr(ICmp, ThenBlock, ElseBlock);
@@ -279,5 +279,5 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
       }
     }
   }
-  return PreservedAnalyses::all();
+  return PreservedAnalyses::none();
 }
