@@ -84,9 +84,9 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
   if(Func.isDeclaration()) return PreservedAnalyses::all();
 
 
-  auto getDT = [&](Functoin& F) -> DominatorTree* {
-    return AM.getResult<DominatorTreeAnalysis>(F);
-  }
+  auto getDT = [&]() -> DominatorTree* {
+    return AM.getResult<DominatorTreeAnalysis>(Func);
+  };
     if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
     std::map<Instruction*, size_t> candidateCallSites;
     std::set<Instruction*> externFuncCalls;
@@ -146,14 +146,13 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
                   continue;
                 }
                 if(optimizedIndices.find(actualValue) != optimizedIndices.end()){
-                  store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), optimizedIndices[actualValue]));
+                  store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(Func.getContext()), optimizedIndices[actualValue]));
                 } else{
                   optimizedIndices.insert(std::make_pair(actualValue, optimizedIndices.size()+2));
-                  store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), optimizedIndices[actualValue]));
+                  store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(Func.getContext()), optimizedIndices[actualValue]));
                 }
               }
             }
-          }
         } else if(auto Int2Ptr = dyn_cast<IntToPtrInst>(&Inst)){
           if(Int2Ptr->hasMetadata("FieldProjection")){
             auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
