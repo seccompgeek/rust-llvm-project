@@ -83,11 +83,6 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
 
   if(Func.isDeclaration()) return PreservedAnalyses::all();
 
-
-  auto getDT = [&]() -> DominatorTree* {
-    return AM.getResult<DominatorTreeAnalysis>(Func);
-  };
-    if(Func.isDeclaration() || Func.getMetadata("SmartPointerAPIFunc")) continue; //no need to analyze smart pointer APIs for this part
     std::map<Instruction*, size_t> candidateCallSites;
     std::set<Instruction*> externFuncCalls;
     std::set<Instruction*> unnecessaryStores;
@@ -171,7 +166,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
     }
 
     if(SmartPtr2ShadowMap.size() > 0){
-      auto DT = getDT(F);
+      auto DT = AM.getResult<DominatorTreeAnalysis>(Func);
       for(auto it: SmartPtr2ShadowMap){
         auto OrigAddr = it.first;
         Instruction* dominator = nullptr;
@@ -250,7 +245,6 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         errs()<<"Inserted phi: "<<*phiNode<<"\n";
         phiNode->addIncoming(StackShadowAddr, ThenBlock);
         phiNode->addIncoming(HeapShadowAddr, ElseBlock);
-        SmartPtr2ShadowMap.insert(std::make_pair(OrigAddr, phiNode));
         
         for(auto inst: it.second){
           inst->replaceAllUsesWith(phiNode);
@@ -260,7 +254,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
     }
 
     if(candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
-      auto &Context = M.getContext();
+      auto &Context = Func.getContext();
       //Constant* TDISlot_ = M.getOrInsertGlobal("_mi_tdi_index",Type::getInt64Ty(Context));
       //GlobalVariable* TDISlot = cast<GlobalVariable>(TDISlot_);
       //TDISlot->setThreadLocal(true);
