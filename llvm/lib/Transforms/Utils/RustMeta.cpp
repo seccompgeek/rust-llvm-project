@@ -149,15 +149,19 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     }
 
     for(auto Int2Ptr: SmartPtrProjections){
+      errs()<<"Working on Int2Ptr: "<<*Int2Ptr;
+      errs()<<"AndInst"<<*(Int2Ptr->getOperand(0))<<"\n";
       auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
+      errs()<<"Ptr2Int: "<<*(AndInst->getOperand(0))<<"\n";
       auto Ptr2Int = cast<Instruction>(AndInst->getOperand(0));
       auto OrigAddr = Ptr2Int->getOperand(0);
 
       Instruction* replacement = nullptr;
       if(SmartPtr2ShadowMap.find(OrigAddr) != SmartPtr2ShadowMap.end()){
         replacement = SmartPtr2ShadowMap[OrigAddr];
+        errs()<<"Found prev replacement: "<<*OrigAddr<<": "<<*replacement<<"\n";
       }else{
-
+        errs()<<"No prev replacement: "<<*origAddr<<"\n";
         auto originalBlock = Int2Ptr->getParent();
         auto currentFunction = &Func;
         auto& context = Func.getContext();
@@ -185,12 +189,16 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         Value *XORed = IRB.CreateXor(MaskedStackAddr, MaskedOrigAddr);
         Value *ICmp = IRB.CreateICmpEQ(Zero, XORed);
 
-        
+        errs()<<"splitting blocks\n";
         BasicBlock* ShadowBlock = originalBlock->splitBasicBlock(cast<Instruction>(ICmp), "shadow_block");
-        BasicBlock* ThenBlock = BasicBlock::Create(context, "shadow.maybe_stack", currentFunction);
-        BasicBlock* ElseBlock = BasicBlock::Create(context, "shadow.maybe_heap");
-        
+        BasicBlock* ThenBlock = BasicBlock::Create(context, "shadow.maybe_stack", currentFunction, ShadowBlock);
+        BasicBlock* ElseBlock = BasicBlock::Create(context, "shadow.maybe_heap", currentFunction, ShadowBlock);
+
+        //currentFunction->getBasicBlockList().insertBefore(ShadowBlock, ThenBlock);
+        //currentFunction->getBasicBlockList().insertBefore(ShadowBlock, ElseBlock);
+        errs()<<"inserted new blocks\n";
         Instruction* insertedBranch =&*(cast<Instruction>(ICmp)->getIterator()++);
+        errs()<<"Inserted branch: "<<*insertedBranch<<"\n";
         IRB.SetInsertPoint(insertedBranch);
         IRB.CreateCondBr(ICmp, ThenBlock, ElseBlock);
         insertedBranch->eraseFromParent();
@@ -210,12 +218,14 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
 
         IRB.SetInsertPoint(ShadowBlock, ShadowBlock->begin());
         PHINode* phiNode = IRB.CreatePHI(Type::getInt8PtrTy(context), 2, "shadow_address");
+        errs()<<"Inserted phi: "<<*phiNode<<"\n";
         phiNode->addIncoming(StackShadowAddr, ThenBlock);
         phiNode->addIncoming(HeapShadowAddr, ElseBlock);
         SmartPtr2ShadowMap.insert(std::make_pair(OrigAddr, phiNode));
         replacement = cast<Instruction>(phiNode);
       }
 
+      errs()<<"replacing: "<<*Int2Ptr<<" with: "<<*replacement<<"\n";
       Int2Ptr->replaceAllUsesWith(replacement);
       Int2Ptr->eraseFromParent();
     }
