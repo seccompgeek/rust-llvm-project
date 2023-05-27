@@ -161,7 +161,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         replacement = SmartPtr2ShadowMap[OrigAddr];
         errs()<<"Found prev replacement: "<<*OrigAddr<<": "<<*replacement<<"\n";
       }else{
-        errs()<<"No prev replacement: "<<*origAddr<<"\n";
+        errs()<<"No prev replacement: "<<*OrigAddr<<"\n";
         auto originalBlock = Int2Ptr->getParent();
         auto currentFunction = &Func;
         auto& context = Func.getContext();
