@@ -166,7 +166,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
     }
 
     if(SmartPtr2ShadowMap.size() > 0){
-      auto DT = AM.getResult<DominatorTreeAnalysis>(Func);
+      DominatorTreeAnalysis::Result& DT = AM.getResult<DominatorTreeAnalysis>(Func);
       for(auto it: SmartPtr2ShadowMap){
         auto OrigAddr = it.first;
         Instruction* dominator = nullptr;
@@ -176,7 +176,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
           }else{
             auto dmBB = dominator->getParent();
             auto instBB = inst->getParent();
-            if((dmBB == instBB && inst->getIterator() < dominator->getIterator()) || !DT->dominates(dominator, instBB)){
+            if((dmBB == instBB && std::distance(dmBB->begin(),inst->getIterator()) < std::distance(dmBB->begin(), dominator->getIterator())) || !DT.dominates(dominator, instBB)){
               dominator = inst;
             }
           }
@@ -260,6 +260,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
       //TDISlot->setThreadLocal(true);
       //auto TDISlot = new GlobalVariable(M, Type::getInt64Ty(Context), false, GlobalVariable::ExternalLinkage,
       //           nullptr, "_mi_tdi_index",nullptr,GlobalVariable::ThreadLocalMode::GeneralDynamicTLSModel,0U,true);
+      Module& M = *Func->getParent();
       auto getTDISlotCallee = M.getOrInsertFunction("mi_get_tdi_index_slot", FunctionType::get(Type::getVoidTy(Context)->getPointerTo(0), false));
       IRBuilder<> Builder(getTDISlotInsertPoint);
       auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
