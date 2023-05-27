@@ -174,7 +174,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
             currentFunction->getParent(), Intrinsic::read_register, arg_type);
         args.push_back(MetadataAsValue::get(context, N));
 
-        Value* SmackMaskValue = ConstantInt::get(Type::getInt64Ty(context), stackMask);
+        Value* StackMaskValue = ConstantInt::get(Type::getInt64Ty(context), stackMask);
         Value* SegmentMaskValue = ConstantInt::get(Type::getInt64Ty(context), segmentMask);
         Value* Zero = ConstantInt::get(Type::getInt64Ty(context), 0);
 
@@ -192,12 +192,12 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         
         Instruction* insertedBranch =&*(cast<Instruction>(ICmp)->getIterator()++);
         IRB.SetInsertPoint(insertedBranch);
-        auto condBranch = IRB.CreateCondBr(ICmp, ThenBlock, ElseBlock);
+        IRB.CreateCondBr(ICmp, ThenBlock, ElseBlock);
         insertedBranch->eraseFromParent();
 
         IRB.SetInsertPoint(ThenBlock);
         Value* StackShadowAddr = IRB.CreateIntToPtr(AndInst, Type::getInt8PtrTy(context));
-        Value* GotoShadow = IRB.CreateBr(ShadowBlock);
+        IRB.CreateBr(ShadowBlock);
 
 
         IRB.SetInsertPoint(ElseBlock);
@@ -206,12 +206,12 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         Value* ShadowAddr = IRB.CreateLoad(Type::getInt8PtrTy(context), segmentPtr);
         IRB.CreateStore(ConstantInt::get(Type::getInt8Ty(context), 1), ShadowAddr);//TODO: get the offset with OR
         Value* HeapShadowAddr = IRB.CreateIntToPtr(AndInst, Type::getInt8PtrTy(context));
-        Value* GotoShadow2 = IRB.CreateBr(ShadowBlock);
+        IRB.CreateBr(ShadowBlock);
 
         IRB.SetInsertPoint(ShadowBlock, ShadowBlock->begin());
         PHINode* phiNode = IRB.CreatePHI(Type::getInt8PtrTy(context), 2, "shadow_address");
-        phiNode->addIncoming(GotoShadow, ThenBlock);
-        phiNode->addIncoming(GotoShadow2, ElseBlock);
+        phiNode->addIncoming(StackShadowAddr, ThenBlock);
+        phiNode->addIncoming(HeapShadowAddr, ElseBlock);
         SmartPtr2ShadowMap.insert(std::make_pair(OrigAddr, phiNode));
         replacement = cast<Instruction>(phiNode);
       }
