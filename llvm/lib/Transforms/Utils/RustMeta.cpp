@@ -87,6 +87,9 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
     std::set<Instruction*> unnecessaryStores;
     std::map<uint64_t, uint64_t> optimizedIndices;
 
+    std::map<Value*, Instruction*> SmartPtr2ShadowMap;
+    std::set<Instruction*> SmartPtrProjections;
+
     Instruction* getTDISlotInsertPoint = nullptr;
     bool Allocas = true;
     for(auto &BB: Func){
@@ -137,8 +140,84 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
               }
             }
           }
+        } else if(auto Int2Ptr = dyn_cast<IntToPtrInst>(&Inst)){
+          if(Int2Ptr->hasMetadata("FieldProjection")){
+            SmartPtrProjections.insert(Int2Ptr);
+          }
         }
       }
+    }
+
+    for(auto Int2Ptr: SmartPtrProjections){
+      auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
+      auto Ptr2Int = cast<Instruction>(AndInst->getOperand(0));
+      auto OrigAddr = Ptr2Int->getOperand(0);
+
+      Instruction* replacement = nullptr;
+      if(SmartPtr2ShadowMap.find(OrigAddr) != SmartPtr2ShadowMap.end()){
+        replacement = SmartPtr2ShadowMap[OrigAddr];
+      }else{
+
+        auto originalBlock = Int2Ptr->getParent();
+        auto currentFunction = &Func;
+        auto& context = Func.getContext();
+
+        uint64_t stackMask = ~((uint64_t)0x7FFFFF);
+        uint64_t segmentMask = (uint64_t)0xFFFFFFFFFE000000;
+        uint64_t lowerAddrOffsetMask = ~((uint64_t) segmentMask);
+
+        std::vector<Type *> arg_type;
+        std::vector<Value *> args;
+        MDNode *N = MDNode::get(context, {MDString::get(context, "rsp")});
+        arg_type.push_back(Type::getInt64Ty(context));
+        Function *readRSPFunc = Intrinsic::getDeclaration(
+            currentFunction->getParent(), Intrinsic::read_register, arg_type);
+        args.push_back(MetadataAsValue::get(context, N));
+
+        Value* SmackMaskValue = ConstantInt::get(Type::getInt64Ty(context), stackMask);
+        Value* SegmentMaskValue = ConstantInt::get(Type::getInt64Ty(context), segmentMask);
+        Value* Zero = ConstantInt::get(Type::getInt64Ty(context), 0);
+
+        IRBuilder<> IRB(Int2Ptr);
+        Value *StackPtr = IRB.CreateCall(readRSPFunc, args);     
+        Value *MaskedStackAddr = IRB.CreateAnd(std::vector<Value*>({StackPtr, StackMaskValue}));
+        Value *MaskedOrigAddr = IRB.CreateAnd(std::vector<Value*>({StackMaskValue, Ptr2Int}));
+        Value *XORed = IRB.CreateXor(MaskedStackAddr, MaskedOrigAddr);
+        Value *ICmp = IRB.CreateICmpEQ(Zero, XORed);
+
+        
+        BasicBlock* ShadowBlock = originalBlock->splitBasicBlock(ICmp, "shadow_block");
+        BasicBlock* ThenBlock = BasicBlock::Create(context, "shadow.maybe_stack", currentFunction);
+        BasicBlock* ElseBlock = BasicBlock::Create(context, "shadow.maybe_heap");
+        
+        Instruction* insertedBranch =&*(cast<Instruction>(ICmp)->getIterator()++);
+        IRB.SetInsertPoint(insertedBranch);
+        auto condBranch = IRB.CreateCondBr(ICmp, ThenBlock, ElseBlock);
+        insertedBranch->eraseFromParent();
+
+        IRB.SetInsertPoint(ThenBlock);
+        Value* StackShadowAddr = IRB.CreateIntToPtr(AndInst, Type::getInt8PtrTy(context));
+        Value* GotoShadow = IRB.CreateBr(ShadowBlock);
+
+
+        IRB.SetInsertPoint(ElseBlock);
+        Value* segmentPtrInt = IRB.CreateAnd(std::vector<Value*>({SegmentMaskValue, Ptr2Int}));
+        Value* segmentPtr = IRB.CreateIntToPtr(segmentPtrInt, Type::getInt8PtrTy(context)->getPointerTo(0));
+        Value* ShadowAddr = IRB.CreateLoad(Type::getInt8PtrTy(context), segmentPtr);
+        IRB.CreateStore(ConstantInt::get(Type::getInt8Ty(context), 1), ShadowAddr);//TODO: get the offset with OR
+        Value* HeapShadowAddr = IRB.CreateIntToPtr(AndInst, Type::getInt8PtrTy(context));
+        Value* GotoShadow2 = IRB.CreateBr(ShadowBlock);
+
+        IRB.SetInsertPoint(ShadowBlock, ShadowBlock->begin());
+        PHINode* phiNode = IRB.CreatePHI(Type::getInt8PtrTy(context), 2, "shadow_address");
+        phiNode->addIncoming(GotoShadow, ThenBlock);
+        phiNode->addIncoming(GotoShadow2, ElseBlock);
+        SmartPtr2ShadowMap.insert(std::make_pair(OrigAddr, phiNode));
+        replacement = cast<Instruction>(phiNode);
+      }
+
+      Int2Ptr->replaceAllUsesWith(replacement);
+      Int2Ptr->eraseFromParent();
     }
 
     if(candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
