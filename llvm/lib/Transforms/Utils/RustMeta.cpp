@@ -102,7 +102,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
           getTDISlotInsertPoint = &Inst;
         }
 
-        if(!TDIAnalysis){
+        if(TDIAnalysis){
           if(auto call = dyn_cast<CallBase>(&Inst)){
             if(auto SMMD = call->getMetadata("ExchangeMallocCall")){
               auto TypeID = cast<MDString>(SMMD->getOperand(0))->getString();
@@ -134,17 +134,6 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
                 if(store->hasMetadata("noalias")){
                   unnecessaryStores.insert(store);
                   continue;
-                }
-                auto storedValue = dyn_cast<ConstantInt>(store->getValueOperand());
-                auto actualValue = storedValue->getZExtValue();
-                if(actualValue == 1){
-                  continue;
-                }
-                if(optimizedIndices.find(actualValue) != optimizedIndices.end()){
-                  store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(Func.getContext()), optimizedIndices[actualValue]));
-                } else{
-                  optimizedIndices.insert(std::make_pair(actualValue, optimizedIndices.size()+2));
-                  store->setOperand(0, ConstantInt::get(IntegerType::getInt64Ty(Func.getContext()), optimizedIndices[actualValue]));
                 }
               }
             }
@@ -303,5 +292,8 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
       }
     }
   
+    for(auto store: unnecessaryStores){
+      store->eraseFromParent();
+    }
   return PreservedAnalyses::none();
 }
