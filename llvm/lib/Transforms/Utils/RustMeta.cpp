@@ -191,6 +191,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
 
         errs()<<"splitting blocks\n";
         BasicBlock* ShadowBlock = originalBlock->splitBasicBlockBefore(++(cast<Instruction>(ICmp)->getIterator()), "shadow_block");
+        ShadowBlock = Int2Ptr->getParent();
         BasicBlock* ThenBlock = BasicBlock::Create(context, "shadow.maybe_stack", currentFunction, ShadowBlock);
         BasicBlock* ElseBlock = BasicBlock::Create(context, "shadow.maybe_heap", currentFunction, ShadowBlock);
 
