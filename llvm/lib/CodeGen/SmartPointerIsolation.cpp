@@ -431,7 +431,10 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 	bool foundMovable = false;
 	if (F.getName() == "main")
 	{
-		auto II = F.begin()->begin();
+
+		return false;
+
+		/*auto II = F.begin()->begin();
 		Instruction *inst = &(*II);
 		IRBuilder<> IRB(inst);
 		Type *StackPtrTy = Type::getInt8PtrTy(C);
@@ -460,7 +463,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 
 		//IRB.SetInsertPoint()
 
-		return true;
+		return true;*/
 	}
 
 	for (BasicBlock &BB : F)
