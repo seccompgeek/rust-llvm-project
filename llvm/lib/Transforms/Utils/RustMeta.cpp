@@ -197,7 +197,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Module &M,
         //currentFunction->getBasicBlockList().insertBefore(ShadowBlock, ThenBlock);
         //currentFunction->getBasicBlockList().insertBefore(ShadowBlock, ElseBlock);
         errs()<<"inserted new blocks\n";
-        Instruction* insertedBranch =&*(cast<Instruction>(ICmp)->getIterator()++);
+        Instruction* insertedBranch =&*(++cast<Instruction>(ICmp)->getIterator());
         errs()<<"Inserted branch: "<<*insertedBranch<<"\n";
         IRB.SetInsertPoint(insertedBranch);
         IRB.CreateCondBr(ICmp, ThenBlock, ElseBlock);
