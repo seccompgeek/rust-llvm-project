@@ -223,6 +223,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         errs()<<"Inserted phi: "<<*phiNode<<"\n";
         phiNode->addIncoming(StackShadowAddr, ThenBlock);
         phiNode->addIncoming(HeapShadowAddr, ElseBlock);
+        inst->replaceAllUsesWith(phiNode);
         inst->eraseFromParent(); //remove the int2Ptr;
         }
       }
