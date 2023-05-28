@@ -140,7 +140,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         } else if(auto Int2Ptr = dyn_cast<IntToPtrInst>(&Inst)){
           if(Int2Ptr->hasMetadata("FieldProjection")){
             IRBuilder<> IRB(++Int2Ptr->getIterator());
-            IRB.CreateLoad(Int2Ptr, Type::getInt8PtrTy(Int2Ptr->getContext()),true); //insert volatile load to maintain performance overhead.
+            IRB.CreateLoad(Type::getInt8PtrTy(Int2Ptr->getContext()), Int2Ptr, true); //insert volatile load to maintain performance overhead.
           }
         }
       }
