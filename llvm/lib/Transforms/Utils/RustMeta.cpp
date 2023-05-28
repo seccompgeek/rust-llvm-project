@@ -155,24 +155,13 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
     }
 
     if(SmartPtr2ShadowMap.size() > 0){
-      DominatorTreeAnalysis::Result& DT = AM.getResult<DominatorTreeAnalysis>(Func);
+      //DominatorTreeAnalysis::Result& DT = AM.getResult<DominatorTreeAnalysis>(Func);
       for(auto it: SmartPtr2ShadowMap){
         auto OrigAddr = it.first;
-        Instruction* dominator = nullptr;
         for(auto inst: it.second){
-          if(dominator == nullptr){
-            dominator = inst;
-          }else{
-            auto dmBB = dominator->getParent();
-            auto instBB = inst->getParent();
-            if((dmBB == instBB && std::distance(dmBB->begin(),inst->getIterator()) < std::distance(dmBB->begin(), dominator->getIterator())) || !DT.dominates(dominator, inst)){
-              dominator = inst;
-            }
-          }
-        }
 
         assert(dominator != nullptr && "Can't have a null dominator!");
-        auto Int2Ptr = dominator;
+        auto Int2Ptr = inst;
         auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
         auto Ptr2Int = cast<Instruction>(AndInst->getOperand(0));
         auto originalBlock = Int2Ptr->getParent();
@@ -234,10 +223,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         errs()<<"Inserted phi: "<<*phiNode<<"\n";
         phiNode->addIncoming(StackShadowAddr, ThenBlock);
         phiNode->addIncoming(HeapShadowAddr, ElseBlock);
-        
-        for(auto inst: it.second){
-          inst->replaceAllUsesWith(phiNode);
-          inst->eraseFromParent();
+        inst->eraseFromParent(); //remove the int2Ptr;
         }
       }
     }
