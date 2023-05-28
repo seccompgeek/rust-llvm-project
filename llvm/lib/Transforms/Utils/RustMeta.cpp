@@ -139,96 +139,13 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
             }
         } else if(auto Int2Ptr = dyn_cast<IntToPtrInst>(&Inst)){
           if(Int2Ptr->hasMetadata("FieldProjection")){
-            auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
-            auto Ptr2Int = cast<Instruction>(AndInst->getOperand(0));
-            auto OrigAddr = Ptr2Int->getOperand(0);
-            if(SmartPtr2ShadowMap.find(OrigAddr) != SmartPtr2ShadowMap.end()){
-              SmartPtr2ShadowMap[OrigAddr].insert(Int2Ptr);
-            }else{
-              std::set<Instruction*> set;
-              set.insert(Int2Ptr);
-              SmartPtr2ShadowMap.insert(std::make_pair(OrigAddr, set));
-            }
+            IRBuilder<> IRB(++Int2Ptr->getIterator());
+            IRB.CreateLoad(Int2Ptr, Type::getInt8PtrTy(Int2Ptr->getContext()),true); //insert volatile load to maintain performance overhead.
           }
         }
       }
     }
-/*
-    if(SmartPtr2ShadowMap.size() > 0){
-      //DominatorTreeAnalysis::Result& DT = AM.getResult<DominatorTreeAnalysis>(Func);
-      for(auto it: SmartPtr2ShadowMap){
-        auto OrigAddr = it.first;
-        for(auto inst: it.second){
 
-        assert(dominator != nullptr && "Can't have a null dominator!");
-        auto Int2Ptr = inst;
-        auto AndInst = cast<Instruction>(Int2Ptr->getOperand(0));
-        auto Ptr2Int = cast<Instruction>(AndInst->getOperand(0));
-        auto originalBlock = Int2Ptr->getParent();
-        auto currentFunction = &Func;
-        auto& context = Func.getContext();
-
-        uint64_t stackMask = ~((uint64_t)0x7FFFFF);
-        uint64_t segmentMask = (uint64_t)0xFFFFFFFFFE000000;
-        uint64_t lowerAddrOffsetMask = ~((uint64_t) segmentMask);
-
-        std::vector<Type *> arg_type;
-        std::vector<Value *> args;
-        MDNode *N = MDNode::get(context, {MDString::get(context, "rsp")});
-        arg_type.push_back(Type::getInt64Ty(context));
-        Function *readRSPFunc = Intrinsic::getDeclaration(
-            currentFunction->getParent(), Intrinsic::read_register, arg_type);
-        args.push_back(MetadataAsValue::get(context, N));
-
-        Value* StackMaskValue = ConstantInt::get(Type::getInt64Ty(context), stackMask);
-        Value* SegmentMaskValue = ConstantInt::get(Type::getInt64Ty(context), segmentMask);
-        Value* Zero = ConstantInt::get(Type::getInt64Ty(context), 0);
-
-        IRBuilder<> IRB(Int2Ptr);
-        Value *StackPtr = IRB.CreateCall(readRSPFunc, args);     
-        Value *MaskedStackAddr = IRB.CreateAnd(std::vector<Value*>({StackPtr, StackMaskValue}));
-        Value *MaskedOrigAddr = IRB.CreateAnd(std::vector<Value*>({StackMaskValue, Ptr2Int}));
-        Value *XORed = IRB.CreateXor(MaskedStackAddr, MaskedOrigAddr);
-        Value *ICmp = IRB.CreateICmpEQ(Zero, XORed);
-
-        errs()<<"splitting blocks\n";
-        BasicBlock* ShadowBlock = originalBlock->splitBasicBlock(++(cast<Instruction>(ICmp)->getIterator()), "shadow_block");
-        BasicBlock* ThenBlock = BasicBlock::Create(context, "shadow.maybe_stack", currentFunction, ShadowBlock);
-        BasicBlock* ElseBlock = BasicBlock::Create(context, "shadow.maybe_heap", currentFunction, ShadowBlock);
-
-        //currentFunction->getBasicBlockList().insertBefore(ShadowBlock, ThenBlock);
-        //currentFunction->getBasicBlockList().insertBefore(ShadowBlock, ElseBlock);
-        errs()<<"inserted new blocks\n";
-        Instruction* insertedBranch =&*(++(cast<Instruction>(ICmp)->getIterator()));
-        errs()<<"Inserted branch: "<<*insertedBranch<<"\n";
-        IRB.SetInsertPoint(insertedBranch);
-        IRB.CreateCondBr(ICmp, ThenBlock, ElseBlock);
-        insertedBranch->eraseFromParent();
-
-        IRB.SetInsertPoint(ThenBlock);
-        Value* StackShadowAddr = IRB.CreateIntToPtr(AndInst, Type::getInt8PtrTy(context));
-        IRB.CreateBr(ShadowBlock);
-
-
-        IRB.SetInsertPoint(ElseBlock);
-        Value* segmentPtrInt = IRB.CreateAnd(std::vector<Value*>({SegmentMaskValue, Ptr2Int}));
-        Value* segmentPtr = IRB.CreateIntToPtr(segmentPtrInt, Type::getInt8PtrTy(context)->getPointerTo(0));
-        //Value* ShadowAddr = IRB.CreateLoad(Type::getInt8PtrTy(context), segmentPtr);
-        //IRB.CreateStore(ConstantInt::get(Type::getInt8Ty(context), 1), ShadowAddr);//TODO: get the offset with OR
-        Value* HeapShadowAddr = IRB.CreateIntToPtr(AndInst, Type::getInt8PtrTy(context));
-        IRB.CreateBr(ShadowBlock);
-
-        IRB.SetInsertPoint(ShadowBlock, ShadowBlock->begin());
-        PHINode* phiNode = IRB.CreatePHI(Type::getInt8PtrTy(context), 2, "shadow_address");
-        errs()<<"Inserted phi: "<<*phiNode<<"\n";
-        phiNode->addIncoming(StackShadowAddr, ThenBlock);
-        phiNode->addIncoming(HeapShadowAddr, ElseBlock);
-        inst->replaceAllUsesWith(phiNode);
-        //inst->eraseFromParent(); //remove the int2Ptr;
-        }
-      }
-    }
-*/
     if(candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
       auto &Context = Func.getContext();
       //Constant* TDISlot_ = M.getOrInsertGlobal("_mi_tdi_index",Type::getInt64Ty(Context));
@@ -274,9 +191,9 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         store->setMetadata("TDIIndexStore", N);
       }
 
-      /*for(auto unstore: unnecessaryStores){
+      for(auto unstore: unnecessaryStores){
         unstore->eraseFromParent();
-      }*/
+      }
     }
   return PreservedAnalyses::none();
 }
