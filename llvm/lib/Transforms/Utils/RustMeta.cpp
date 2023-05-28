@@ -153,7 +153,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         }
       }
     }
-
+/*
     if(SmartPtr2ShadowMap.size() > 0){
       //DominatorTreeAnalysis::Result& DT = AM.getResult<DominatorTreeAnalysis>(Func);
       for(auto it: SmartPtr2ShadowMap){
@@ -228,7 +228,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         }
       }
     }
-
+*/
     if(candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
       auto &Context = Func.getContext();
       //Constant* TDISlot_ = M.getOrInsertGlobal("_mi_tdi_index",Type::getInt64Ty(Context));
@@ -274,13 +274,9 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         store->setMetadata("TDIIndexStore", N);
       }
 
-      for(auto unstore: unnecessaryStores){
+      /*for(auto unstore: unnecessaryStores){
         unstore->eraseFromParent();
-      }
-    }
-  
-    for(auto store: unnecessaryStores){
-      store->eraseFromParent();
+      }*/
     }
   return PreservedAnalyses::none();
 }
