@@ -213,8 +213,8 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         IRB.SetInsertPoint(ElseBlock);
         Value* segmentPtrInt = IRB.CreateAnd(std::vector<Value*>({SegmentMaskValue, Ptr2Int}));
         Value* segmentPtr = IRB.CreateIntToPtr(segmentPtrInt, Type::getInt8PtrTy(context)->getPointerTo(0));
-        Value* ShadowAddr = IRB.CreateLoad(Type::getInt8PtrTy(context), segmentPtr);
-        IRB.CreateStore(ConstantInt::get(Type::getInt8Ty(context), 1), ShadowAddr);//TODO: get the offset with OR
+        //Value* ShadowAddr = IRB.CreateLoad(Type::getInt8PtrTy(context), segmentPtr);
+        //IRB.CreateStore(ConstantInt::get(Type::getInt8Ty(context), 1), ShadowAddr);//TODO: get the offset with OR
         Value* HeapShadowAddr = IRB.CreateIntToPtr(AndInst, Type::getInt8PtrTy(context));
         IRB.CreateBr(ShadowBlock);
 
@@ -224,7 +224,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         phiNode->addIncoming(StackShadowAddr, ThenBlock);
         phiNode->addIncoming(HeapShadowAddr, ElseBlock);
         inst->replaceAllUsesWith(phiNode);
-        inst->eraseFromParent(); //remove the int2Ptr;
+        //inst->eraseFromParent(); //remove the int2Ptr;
         }
       }
     }
