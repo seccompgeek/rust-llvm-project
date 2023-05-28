@@ -316,6 +316,7 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 						 bool isPure)
 {
 	IRBuilder<> IRB(&F.front(), F.begin()->getFirstInsertionPt());
+	
 	/*
 	if (DISubprogram *SP = F.getSubprogram())
 		IRB.SetCurrentDebugLocation(DebugLoc::get(SP->getScopeLine(), 0, SP));
@@ -337,6 +338,14 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	
 	LLVMContext &C = F.getContext();
 	std::vector<Value *> args;
+	
+	/*FunctionCallee Fn = F.getParent()->getOrInsertFunction(
+			"__get_wrapper", StackPtrTy);
+	IRB.CreateCall(Fn);*/
+
+	/*FunctionCallee Checks = F.getParent()->getOrInsertFunction(
+		"check_fs", Type::getVoidTy(C));
+	IRB.CreateCall(Checks);*/
 
 	StringRef asmCode = "movq %fs:${1:c}, $0";
 	StringRef constraints = "=r,i,~{dirflag},~{fpsr},~{flags}";
@@ -351,10 +360,8 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	FS2MEM->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::ReadNone);
 	// WARNNING 
 
-	Value *ExternStackPointer = IRB.CreateIntToPtr(FS2MEM, Type::getInt64PtrTy(C));
-
 	Type *int64Ptr = Type::getInt64PtrTy(C);
-	ExternStackPointer = IRB.CreateIntToPtr(ExternStackPointer, int64Ptr);
+	Value *ExternStackPointer = IRB.CreateIntToPtr(FS2MEM, int64Ptr);
 	ExternStackPointer = IRB.CreateBitCast(ExternStackPointer, int64Ptr->getPointerTo(0));
 
 	*ExternStackPtr =
@@ -365,20 +372,18 @@ void ExternStack::run(ArrayRef<AllocaInst *> StaticAllocas,
 	
 	Instruction *BasePtr = IRB.CreateLoad(StackPtrTy, *ExternStackPtr, false, name);
 	Value *StaticTop = moveStaticAllocasToExternStack(IRB, F, StaticAllocas, BasePtr, *ExternStackPtr, isPure);
-	//IRB.SetInsertPoint(cast<Instruction>(PureTop)->getNextNode());
-	//IRB.CreateStore(StaticTop, PureExternStackPtr);
+	
 	AllocaInst *DynamicTop = createStackRestorePoints(
 		IRB, F, StackRestorePoints, StaticTop, *ExternStackPtr,!DynamicAllocas.empty(), isPure);
 
 	moveDynamicAllocasToExternStack(F, *ExternStackPtr, DynamicTop,
 									DynamicAllocas);
-
+	
 	for (ReturnInst *RI : Returns)
 	{
 		IRB.SetInsertPoint(RI);
 		IRB.CreateStore(BasePtr, *ExternStackPtr);
 	}
-	
 }
 
 //--------------------------------pass definition--------------------------------//
@@ -453,6 +458,8 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 		CallInst *MEM2FS = IRB.CreateCall(inlineAsm, args);
 		MEM2FS->addAttributeAtIndex(AttributeList::FunctionIndex, Attribute::NoUnwind);
 
+		//IRB.SetInsertPoint()
+
 		return true;
 	}
 
@@ -473,7 +480,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 			}
 			else if (auto AI = dyn_cast<AllocaInst>(&I))
 			{
-				if (AI->hasMetadata("RustMeta-Smart-Pointer") || AI->hasMetadata("RustMeta-Smart-Pointer-House"))
+				if (AI->hasMetadata("RustMeta-Smart-Pointer"))
 				{
 					if (AI->isStaticAlloca())
 					{
@@ -495,7 +502,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 						}
 					}
 				}
-				/*else if (AI->hasMetadata("RustMeta-Smart-Pointer"))
+				else if (AI->hasMetadata("RustMeta-Smart-Pointer-House"))
 				{
 					if (AI->isStaticAlloca())
 					{
@@ -516,7 +523,7 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 							foundMovable = true;
 						}
 					}	
-				}*/
+				}
 			}
 
 			else if (auto RI = dyn_cast<ReturnInst>(&I))
@@ -530,8 +537,8 @@ bool RustSmartPointerIsolationPass::runOnFunction(Function &F)
 	{
 		externStack->run(StaticArrayAllocas, DynamicArrayAllocas,
 						 StackRestorePoints, Returns, true);
-		//externStack->run(StaticHousedAllocas, DynamicHousedAllocas,
-		//				 StackRestorePoints, Returns, false);
+		externStack->run(StaticHousedAllocas, DynamicHousedAllocas,
+						 StackRestorePoints, Returns, false);
 	}
 	return foundMovable;
 }
