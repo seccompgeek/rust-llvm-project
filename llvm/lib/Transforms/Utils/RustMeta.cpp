@@ -92,6 +92,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
     std::set<Instruction*> SmartPtrProjections;
 
     bool TDIAnalysis = !Func.getMetadata("SmartPointerAPIFunc");
+    bool foundTDIIndexSet = false;
 
     Instruction* getTDISlotInsertPoint = nullptr;
     bool Allocas = true;
@@ -124,6 +125,28 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
                 externFuncCalls.insert(call);
               }
             }
+
+            if(auto calledFunc = call->getCalledFunction()){
+              auto funcName = calledFunc->getName();
+              if(funcName.equals("__rust_alloc") || funcName.equals("__rust_alloc_zeroed") || funcName.equals("__rust_realloc")) {
+                Module* M = Func.getParent();
+                auto& context = M->getContext();
+                FunctionCallee* callee = M->getOrInsertFunction("_tdi_set_ptr_valid", FunctionType::get(Type::getVoidTy(context), std::vector<Type*>({Type::getInt8PtrTy(context)}),false));
+
+                IRBuilder<> IRB(&*(++call->getIterator()));
+                IRB.CreateCall(callee, std::vector<Value*>({call}));
+              }else if(funcName.equals("__rust_dealloc")){
+                Module* M = Func.getParent();
+                auto& context = M->getContext();
+                FunctionCallee* callee = M->getOrInsertFunction("_tdi_validate_ptr", FunctionType::get(Type::getInt8Ty(context), std::vector<Type*>({Type::getInt8PtrTy(context)}), false));
+
+                IRBuilder<> IRB(call);
+                IRB.CreateCall(callee, std::vector<Value*>({call->getArgOperand(0)}));
+                IRB.SetInsertPoint(&*(++call->getIterator()));
+                callee = M->getOrInsertFunction("_tdi_set_ptr_invalid", FunctionType::get(Type::getVoidTy(context), std::vector<Type*>({Type::getInt8PtrTy(context)}), false));
+                IRB.CreateCall(callee, std::vector<Value*>({call->getArgOperand(0)}));
+              }
+            }
           }
         }
         
@@ -131,6 +154,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
             auto dest = store->getPointerOperand();
             if(auto TDIIndex = dyn_cast<GlobalVariable>(dest)){
               if(TDIIndex->getName().equals("_mi_tdi_index")){
+                foundTDIIndexSet = true;
                 if(store->hasMetadata("noalias")){
                   unnecessaryStores.insert(store);
                   continue;
@@ -146,7 +170,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
       }
     }
 
-    if(candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
+    if(!foundTDIIndexSet && candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
       auto &Context = Func.getContext();
       //Constant* TDISlot_ = M.getOrInsertGlobal("_mi_tdi_index",Type::getInt64Ty(Context));
       //GlobalVariable* TDISlot = cast<GlobalVariable>(TDISlot_);
