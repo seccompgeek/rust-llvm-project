@@ -131,14 +131,14 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
               if(funcName.equals("__rust_alloc") || funcName.equals("__rust_alloc_zeroed") || funcName.equals("__rust_realloc")) {
                 Module* M = Func.getParent();
                 auto& context = M->getContext();
-                FunctionCallee* callee = M->getOrInsertFunction("_tdi_set_ptr_valid", FunctionType::get(Type::getVoidTy(context), std::vector<Type*>({Type::getInt8PtrTy(context)}),false));
+                FunctionCallee callee = M->getOrInsertFunction("_tdi_set_ptr_valid", FunctionType::get(Type::getVoidTy(context), std::vector<Type*>({Type::getInt8PtrTy(context)}),false));
 
                 IRBuilder<> IRB(&*(++call->getIterator()));
                 IRB.CreateCall(callee, std::vector<Value*>({call}));
               }else if(funcName.equals("__rust_dealloc")){
                 Module* M = Func.getParent();
                 auto& context = M->getContext();
-                FunctionCallee* callee = M->getOrInsertFunction("_tdi_validate_ptr", FunctionType::get(Type::getInt8Ty(context), std::vector<Type*>({Type::getInt8PtrTy(context)}), false));
+                FunctionCallee callee = M->getOrInsertFunction("_tdi_validate_ptr", FunctionType::get(Type::getInt8Ty(context), std::vector<Type*>({Type::getInt8PtrTy(context)}), false));
 
                 IRBuilder<> IRB(call);
                 IRB.CreateCall(callee, std::vector<Value*>({call->getArgOperand(0)}));
