@@ -883,15 +883,15 @@ void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId){
 
   Module* M = call->getParent()->getParent()->getParent();
   FunctionCallee enableMPKCallee = M->getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::get(Type::getVoidTy(C), false));
-  FunctionCallee disableMPKCallee = M->getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::get(Type::getVoidTy(C), false));
+  //FunctionCallee disableMPKCallee = M->getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::get(Type::getVoidTy(C), false));
   IRBuilder<> IRB(call);
   IRB.CreateCall(enableMPKCallee);
-  if(call->getNextNode() == nullptr){
+  /*if(call->getNextNode() == nullptr){
     IRB.SetInsertPoint(call->getParent());
   }else {
     IRB.SetInsertPoint(call->getNextNode());
   }
-  IRB.CreateCall(disableMPKCallee);
+  IRB.CreateCall(disableMPKCallee);*/
 }
 
 void LLVMMarkFieldProjection(LLVMValueRef Inst, size_t Idx){
