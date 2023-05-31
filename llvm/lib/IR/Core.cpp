@@ -880,18 +880,6 @@ void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId){
   LLVMContext &C = call->getContext();
   MDNode* N = MDNode::get(C, MDString::get(C, std::to_string(TypeId)));
   call->setMetadata("ExchangeMallocCall", N);
-
-  Module* M = call->getParent()->getParent()->getParent();
-  FunctionCallee enableMPKCallee = M->getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::get(Type::getVoidTy(C), false));
-  //FunctionCallee disableMPKCallee = M->getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::get(Type::getVoidTy(C), false));
-  IRBuilder<> IRB(call);
-  IRB.CreateCall(enableMPKCallee);
-  /*if(call->getNextNode() == nullptr){
-    IRB.SetInsertPoint(call->getParent());
-  }else {
-    IRB.SetInsertPoint(call->getNextNode());
-  }
-  IRB.CreateCall(disableMPKCallee);*/
 }
 
 void LLVMMarkFieldProjection(LLVMValueRef Inst, size_t Idx){
@@ -966,7 +954,20 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   Module* module = inst->getParent()->getParent()->getParent();
   auto TDISlot = cast<GlobalVariable>(module->getOrInsertGlobal("_mi_tdi_index", Type::getInt64Ty(context)));
   TDISlot->setThreadLocal(true);
-  Builder.CreateStore(Index, TDISlot, true);
+  auto store = Builder.CreateStore(Index, TDISlot, true);
+
+
+  Module* M = parentFunc->getParent();
+  FunctionCallee enableMPKCallee = M->getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::get(Type::getVoidTy(context), false));
+  FunctionCallee disableMPKCallee = M->getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::get(Type::getVoidTy(context), false));
+  IRBuilder<> IRB(store);
+  IRB.CreateCall(enableMPKCallee);
+  if(inst->getNextNode() == nullptr){
+    IRB.SetInsertPoint(inst->getParent());
+  }else {
+    IRB.SetInsertPoint(inst->getNextNode());
+  }
+  IRB.CreateCall(disableMPKCallee);
 }
 
 LLVMValueRef LLVMReadStackPtr(LLVMBasicBlockRef Block, LLVMValueRef Func) {
