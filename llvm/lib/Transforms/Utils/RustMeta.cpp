@@ -138,13 +138,10 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
               }else if(funcName.equals("__rust_dealloc")){
                 Module* M = Func.getParent();
                 auto& context = M->getContext();
-                FunctionCallee callee = M->getOrInsertFunction("_tdi_validate_ptr", FunctionType::get(Type::getInt8Ty(context), std::vector<Type*>({Type::getInt8PtrTy(context)}), false));
-
+                FunctionCallee callee = M->getOrInsertFunction("_tdi_set_ptr_invalid", FunctionType::get(Type::getVoidTy(context), std::vector<Type*>({Type::getInt8PtrTy(context)}), false));
                 IRBuilder<> IRB(call);
                 IRB.CreateCall(callee, std::vector<Value*>({call->getArgOperand(0)}));
-                IRB.SetInsertPoint(&*(++call->getIterator()));
-                callee = M->getOrInsertFunction("_tdi_set_ptr_invalid", FunctionType::get(Type::getVoidTy(context), std::vector<Type*>({Type::getInt8PtrTy(context)}), false));
-                IRB.CreateCall(callee, std::vector<Value*>({call->getArgOperand(0)}));
+                // no need to validate before this, the set-invalid function will validate first!
               }
             }
           }
