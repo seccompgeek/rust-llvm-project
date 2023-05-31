@@ -959,15 +959,9 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
 
   Module* M = parentFunc->getParent();
   FunctionCallee enableMPKCallee = M->getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::get(Type::getVoidTy(context), false));
-  FunctionCallee disableMPKCallee = M->getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::get(Type::getVoidTy(context), false));
+  //FunctionCallee disableMPKCallee = M->getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::get(Type::getVoidTy(context), false));
   IRBuilder<> IRB(store);
   IRB.CreateCall(enableMPKCallee);
-  if(inst->getNextNode() == nullptr){
-    IRB.SetInsertPoint(inst->getParent());
-  }else {
-    IRB.SetInsertPoint(inst->getNextNode());
-  }
-  IRB.CreateCall(disableMPKCallee);
 }
 
 LLVMValueRef LLVMReadStackPtr(LLVMBasicBlockRef Block, LLVMValueRef Func) {
