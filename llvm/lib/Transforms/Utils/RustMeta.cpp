@@ -116,15 +116,31 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
       auto TDISlot = Builder.CreateBitCast(TDISlotCall, Type::getInt64PtrTy(Context), "tdi_slot");
       auto ResetValue = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);*/
       FunctionCallee enableMPK = M.getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::getVoidTy(Context));
+      std::set<BasicBlock*> mpkEnabledBlocks;
       for(auto it: candidateCallSites){
         Builder.SetInsertPoint(it.first);
         if(it.first->getMetadata("SetMPKEnable")){
-            Builder.CreateCall(enableMPK, std::vector<Value*>({}));
+            if(mpkEnabledBlocks.find(it.first->getParent()) == mpkEnabledBlocks.end()){
+              Builder.CreateCall(enableMPK, std::vector<Value*>({}));
+              mpkEnabledBlocks.insert(it.first->getParent());
+            }
         }
         auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), it.second, false);
         auto store = Builder.CreateStore(Index, TDISlot, true);
         MDNode* N = MDNode::get(Context, MDString::get(Context, "added by metaupdate pass"));
         store->setMetadata("TDIIndexStore", N);
+      }
+
+      FunctionCallee disableMPK = M.getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::getVoidTy(Context));
+      for(auto block: mpkEnabledBlocks){
+        auto lastInst = block->back();
+        IRBuilder<> IRB(&lastInst);
+        if(auto invokeInst = dyn_cast<InvokeInst>(&lastInst)){
+          if(auto lp = invokeInst->getLandingPadInst()){
+            IRB.SetInsertPoint(lp->getNextNode());
+
+          }
+        }
       }
 
       for(auto it: externFuncCalls){
