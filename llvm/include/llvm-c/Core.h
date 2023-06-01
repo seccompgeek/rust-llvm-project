@@ -2486,7 +2486,7 @@ void LLVMMarkExchangeMallocFunc(LLVMValueRef Fn);
 /**
  * @brief Mark exchange_malloc call
 */
-void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId);
+void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId, uint EnableMPK);
 /**
  * @brief Mark external functions for Rust
 */
