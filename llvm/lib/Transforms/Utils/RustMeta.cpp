@@ -131,7 +131,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
         store->setMetadata("TDIIndexStore", N);
       }
 
-      FunctionCallee disableMPK = M.getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::getVoidTy(Context));
+      /*FunctionCallee disableMPK = M.getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::getVoidTy(Context));
       for(auto block: mpkEnabledBlocks){
         auto lastInst = block->back();
         IRBuilder<> IRB(&lastInst);
@@ -141,7 +141,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
 
           }
         }
-      }
+      }*/
 
       for(auto it: externFuncCalls){
         Builder.SetInsertPoint(it);
