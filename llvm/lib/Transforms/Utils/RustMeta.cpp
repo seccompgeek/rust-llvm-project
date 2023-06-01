@@ -110,9 +110,6 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
       Constant* TDISlot_ = M.getOrInsertGlobal("_mi_tdi_index",Type::getInt64Ty(Context));
       GlobalVariable* TDISlot = cast<GlobalVariable>(TDISlot_);
       TDISlot->setThreadLocal(true);
-      auto TDISlot = new GlobalVariable(M, Type::getInt64Ty(Context), false, GlobalVariable::ExternalLinkage,
-                 nullptr, "_mi_tdi_index",nullptr,GlobalVariable::ThreadLocalMode::GeneralDynamicTLSModel,0U,true);
-     
       //auto getTDISlotCallee = M.getOrInsertFunction("mi_get_tdi_index_slot", FunctionType::get(Type::getVoidTy(Context)->getPointerTo(0), false));
       IRBuilder<> Builder(getTDISlotInsertPoint);
       /*auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
