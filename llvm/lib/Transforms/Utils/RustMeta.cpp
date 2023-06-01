@@ -115,7 +115,7 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
       /*auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
       auto TDISlot = Builder.CreateBitCast(TDISlotCall, Type::getInt64PtrTy(Context), "tdi_slot");
       auto ResetValue = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);*/
-      FunctionCallee enableMPK = M.getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::getVoidTy(conext));
+      FunctionCallee enableMPK = M.getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::getVoidTy(context));
       for(auto it: candidateCallSites){
         Builder.SetInsertPoint(it.first);
         if(it.first->getMetadata("SetMPKEnable")){
