@@ -18,69 +18,6 @@ std::string MetaUpdateSMAPIPass::typeToString(Type* type){
 PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
                                                FunctionAnalysisManager &AM) {
 
-  /*Find special types housed in normal structs and insert new structs to replace them
-  auto structTypes = M.getIdentifiedStructTypes();
-  auto specialTypeMetadata = M.getNamedMetadata("SpecialTypes");
-  std::map<StructType*, StructType*> specialTypeHousedStructsMap;
-  std::map<StructType*, std::map<int, int>> specialTypeFieldRemap;
-  std::set<StructType*> specialTypes;
-  for(auto MDIt: specialTypeMetadata->operands()){
-    auto MDValue = cast<MDString>(MDIt)->getString();
-    for(auto type: structTypes){
-      if (type->getStructName().equals(MDValue)){
-        specialTypes.insert(type);
-      }
-    }
-  }
-
-  for(auto type: structTypes){
-    if (specialTypes.find(type) == specialTypes.end()){
-      auto totalFields = type->getStructNumElements();
-      SmallVector<Type*> specialFields;
-      SmallVector<int> FieldIndices;
-      for(int i=0; i<totalFields; i++){
-        auto fieldType = type->getStructElementType(i);
-        if(auto structFieldType = dyn_cast<StructType>(fieldType)){
-          if(specialTypes.find(structFieldType) != specialTypes.end()){
-            specialFields.push_back(fieldType);
-            FieldIndices.push_back(i);
-          }
-        }
-      }
-
-      if(specialFields.size() != 0){//TODO: if all fields are special, make this a special type as well as an optimization
-        StructType* newType = StructType::create(specialFields);
-        newType->setName(type->getStructName().str()+".safe");
-        specialTypeHousedStructsMap.insert(std::make_pair(type, newType));
-        specialTypeFieldRemap.insert(std::make_pair(type, std::map<int, int>()));
-        int counter = 0;
-        for(auto i: FieldIndices){
-          specialTypeFieldRemap[type].insert(std::make_pair(i, counter++));
-        }
-      }
-    }
-  }
-
-  auto checkIsZeroIdxGep = [&specialTypeFieldRemap](Type* type) {
-    if(auto structType = dyn_cast<StructType>(type)){
-      return specialTypeFieldRemap.find(structType) != specialTypeFieldRemap.end() && specialTypeFieldRemap[structType].find(0) != specialTypeFieldRemap[structType].end();
-    }else {
-      return false;
-    }
-  };
-
-  for (auto &Func: M){
-    if (Func.isDeclaration()) continue;
-    std::map<Instruction*, Instruction*> housingPtrToSafePtrMap;
-    for(auto &Inst: Func) {
-      if(auto memInst = dyn_cast<MemTransferInst>(&Inst)){
-        auto source = memInst->getSource();
-        auto dest = memInst->getDest();
-        auto len = memInst->getLength();
-      }
-    }
-  }*/
-
   if(Func.isDeclaration()) return PreservedAnalyses::all();
 
     std::map<Instruction*, size_t> candidateCallSites;
@@ -169,39 +106,27 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
 
     if(!foundTDIIndexSet && candidateCallSites.size() > 0){ // no need to continue if we don't have any calls to focus on
       auto &Context = Func.getContext();
-      //Constant* TDISlot_ = M.getOrInsertGlobal("_mi_tdi_index",Type::getInt64Ty(Context));
-      //GlobalVariable* TDISlot = cast<GlobalVariable>(TDISlot_);
-      //TDISlot->setThreadLocal(true);
-      //auto TDISlot = new GlobalVariable(M, Type::getInt64Ty(Context), false, GlobalVariable::ExternalLinkage,
-      //           nullptr, "_mi_tdi_index",nullptr,GlobalVariable::ThreadLocalMode::GeneralDynamicTLSModel,0U,true);
+      Constant* TDISlot_ = M.getOrInsertGlobal("_mi_tdi_index",Type::getInt64Ty(Context));
+      GlobalVariable* TDISlot = cast<GlobalVariable>(TDISlot_);
+      TDISlot->setThreadLocal(true);
+      auto TDISlot = new GlobalVariable(M, Type::getInt64Ty(Context), false, GlobalVariable::ExternalLinkage,
+                 nullptr, "_mi_tdi_index",nullptr,GlobalVariable::ThreadLocalMode::GeneralDynamicTLSModel,0U,true);
       Module& M = *Func.getParent();
-      auto getTDISlotCallee = M.getOrInsertFunction("mi_get_tdi_index_slot", FunctionType::get(Type::getVoidTy(Context)->getPointerTo(0), false));
+      //auto getTDISlotCallee = M.getOrInsertFunction("mi_get_tdi_index_slot", FunctionType::get(Type::getVoidTy(Context)->getPointerTo(0), false));
       IRBuilder<> Builder(getTDISlotInsertPoint);
-      auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
+      /*auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
       auto TDISlot = Builder.CreateBitCast(TDISlotCall, Type::getInt64PtrTy(Context), "tdi_slot");
-      auto ResetValue = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);
-
+      auto ResetValue = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);*/
+      FunctionCallee enableMPK = M.getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::getVoidTy(conext));
       for(auto it: candidateCallSites){
         Builder.SetInsertPoint(it.first);
+        if(it.first->getMetadata("SetMPKEnable")){
+            Builder.CreateCall(enableMPK, std::vector<Value*>({}));
+        }
         auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), it.second, false);
         auto store = Builder.CreateStore(Index, TDISlot, true);
         MDNode* N = MDNode::get(Context, MDString::get(Context, "added by metaupdate pass"));
         store->setMetadata("TDIIndexStore", N);
-        /*if(auto callInst = dyn_cast<CallInst>(it.first)){
-          Builder.SetInsertPoint(it.first->getNextNode());
-          Builder.CreateStore(ResetValue, TDISlot, false);
-        }else{
-          assert(isa<InvokeInst>(it.first) && "Expecting anything other than call or invoke?");
-          auto invokeInst = dyn_cast<InvokeInst>(it.first);
-          Builder.SetInsertPoint(&*invokeInst->getNormalDest()->begin());
-          Builder.CreateStore(ResetValue, TDISlot, false);
-          auto nextInsertPoint = &*invokeInst->getUnwindDest()->begin();
-          if (isa<LandingPadInst>(nextInsertPoint)){
-            nextInsertPoint = nextInsertPoint->getNextNode();
-          }
-          Builder.SetInsertPoint(nextInsertPoint);
-          Builder.CreateStore(ResetValue, TDISlot, false);
-        }*/
       }
 
       for(auto it: externFuncCalls){

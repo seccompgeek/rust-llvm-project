@@ -875,11 +875,15 @@ void LLVMSetValueName(LLVMValueRef Val, const char *Name) {
   unwrap(Val)->setName(Name);
 }
 
-void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId){
+void LLVMMarkExchangeMallocCall(LLVMValueRef Call, unsigned long long TypeId, uint enableMPK){
   CallBase* call = unwrap<CallBase>(Call);
   LLVMContext &C = call->getContext();
   MDNode* N = MDNode::get(C, MDString::get(C, std::to_string(TypeId)));
   call->setMetadata("ExchangeMallocCall", N);
+  if(enableMPK){
+    MDNode* N = MDNode::get(C, MDString::get(C, "Enable MPK"));
+    call->setMetadata("SetMPKEnable", N);
+  }
 }
 
 void LLVMMarkFieldProjection(LLVMValueRef Inst, size_t Idx){
@@ -934,7 +938,7 @@ void LLVMSetSmartPointerAPIMetadata(LLVMValueRef Fn, unsigned long long TypeId){
 }
 
 void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
-  Instruction* inst = unwrap<Instruction>(TDIIndexPlace);
+  /*Instruction* inst = unwrap<Instruction>(TDIIndexPlace);
   Function* parentFunc = inst->getParent()->getParent();
   if(parentFunc->getMetadata("SmartPointerAPIFunc")){
     return;
@@ -961,7 +965,7 @@ void LLVMStoreTDIIndex(LLVMValueRef TDIIndexPlace, unsigned long long Indx){
   FunctionCallee enableMPKCallee = M->getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::get(Type::getVoidTy(context), false));
   //FunctionCallee disableMPKCallee = M->getOrInsertFunction("_mi_mpk_disable_writes", FunctionType::get(Type::getVoidTy(context), false));
   IRBuilder<> IRB(store);
-  IRB.CreateCall(enableMPKCallee);
+  IRB.CreateCall(enableMPKCallee);*/
 }
 
 LLVMValueRef LLVMReadStackPtr(LLVMBasicBlockRef Block, LLVMValueRef Func) {
