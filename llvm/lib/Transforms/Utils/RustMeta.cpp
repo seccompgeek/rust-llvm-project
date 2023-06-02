@@ -3,6 +3,7 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/InlineAsm.h"
 #include <map>
 #include <vector>
 
@@ -115,14 +116,25 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
       /*auto TDISlotCall = Builder.CreateCall(getTDISlotCallee);
       auto TDISlot = Builder.CreateBitCast(TDISlotCall, Type::getInt64PtrTy(Context), "tdi_slot");
       auto ResetValue = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);*/
+
+      auto MPKFuncTy = FunctionType::get(Type::getVoidTy(Context), false);
+      auto setEax = InlineAsm::get(MPKFuncTy, "xorq eax, eax", "", false, false, InlineAsm::AD_ATT); //"xorq eax, eax"; //we're using enable for both en/dis, just need to measure OH
+      auto clearECX = InlineAsm::get(MPKFuncTy, "xorq ecx, ecx", "", false, false, InlineAsm::AD_ATT);
+      auto clearEDX = InlineAsm::get(MPKFuncTy, "xorq edx, edx", "", false, false, InlineAsm::AD_ATT);
+      auto WRPKRU = InlineAsm::get(MPKFuncTy, "wrpkru", "", false, false, InlineAsm::AD_Intel);
+
       FunctionCallee enableMPK = M.getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::getVoidTy(Context));
       std::set<BasicBlock*> mpkEnabledBlocks;
       for(auto it: candidateCallSites){
         Builder.SetInsertPoint(it.first);
         if(it.first->getMetadata("SetMPKEnable")){
             if(mpkEnabledBlocks.find(it.first->getParent()) == mpkEnabledBlocks.end()){
-              Builder.CreateCall(enableMPK, std::vector<Value*>({}));
-              mpkEnabledBlocks.insert(it.first->getParent());
+              //Builder.CreateCall(enableMPK, std::vector<Value*>({}));
+              Builder.SetInsertPoint(it.first);
+              Builder.CreateCall(setEax);
+              Builder.CreateCall(clearECX);
+              Builder.CreateCall(clearEDX);
+              Builder.CreateCall(WRPKRU);
             }
         }
         auto Index = ConstantInt::get(IntegerType::getInt64Ty(Context), it.second, false);
