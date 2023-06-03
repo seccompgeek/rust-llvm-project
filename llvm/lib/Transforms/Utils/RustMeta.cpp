@@ -118,9 +118,9 @@ PreservedAnalyses MetaUpdateSMAPIPass::run(Function& Func,
       auto ResetValue = ConstantInt::get(IntegerType::getInt64Ty(Context), 0, false);*/
 
       auto MPKFuncTy = FunctionType::get(Type::getVoidTy(Context), false);
-      auto setEax = InlineAsm::get(MPKFuncTy, "xor %eax, %eax", "", false, false, InlineAsm::AD_ATT); //"xorq eax, eax"; //we're using enable for both en/dis, just need to measure OH
-      auto clearECX = InlineAsm::get(MPKFuncTy, "xor %ecx, %ecx", "", false, false, InlineAsm::AD_ATT);
-      auto clearEDX = InlineAsm::get(MPKFuncTy, "xor %edx, %edx", "", false, false, InlineAsm::AD_ATT);
+      auto setEax = InlineAsm::get(MPKFuncTy, "xor %eax, %eax", "~{dirflag},~{eax},~{flags}", false, false, InlineAsm::AD_ATT); //"xorq eax, eax"; //we're using enable for both en/dis, just need to measure OH
+      auto clearECX = InlineAsm::get(MPKFuncTy, "xor %ecx, %ecx", "~{dirflag},~{ecx},~{flags}", false, false, InlineAsm::AD_ATT);
+      auto clearEDX = InlineAsm::get(MPKFuncTy, "xor %edx, %edx", "~{dirflag},~{edx},~{flags}", false, false, InlineAsm::AD_ATT);
       auto WRPKRU = InlineAsm::get(MPKFuncTy, "wrpkru", "", false, false, InlineAsm::AD_Intel);
 
       FunctionCallee enableMPK = M.getOrInsertFunction("_mi_mpk_enable_writes", FunctionType::getVoidTy(Context));
