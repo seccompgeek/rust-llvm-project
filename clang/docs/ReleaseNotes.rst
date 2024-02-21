@@ -171,6 +171,22 @@ AST Dumping Potentially Breaking Changes
       "qualType": "foo"
     }
 
+Clang Frontend Potentially Breaking Changes
+-------------------------------------------
+- Target OS macros extension
+  A new Clang extension (see :ref:`here <target_os_detail>`) is enabled for
+  Darwin (Apple platform) targets. Clang now defines ``TARGET_OS_*`` macros for
+  these targets, which could break existing code bases with improper checks for
+  the ``TARGET_OS_`` macros. For example, existing checks might fail to include
+  the ``TargetConditionals.h`` header from Apple SDKs and therefore leaving the
+  macros undefined and guarded code unexercised.
+
+  Affected code should be checked to see if it's still intended for the specific
+  target and fixed accordingly.
+
+  The extension can be turned off by the option ``-fno-define-target-os-macros``
+  as a workaround.
+
 What's New in Clang |release|?
 ==============================
 Some of the major new features and improvements to Clang are listed
@@ -304,6 +320,10 @@ Non-comprehensive list of changes in this release
 
 * The version of Unicode used by Clang (primarily to parse identifiers) has been updated to 15.1.
 
+* Clang now defines macro ``__LLVM_INSTR_PROFILE_GENERATE`` when compiling with
+  PGO instrumentation profile generation, and ``__LLVM_INSTR_PROFILE_USE`` when
+  compiling with PGO profile use.
+
 New Compiler Flags
 ------------------
 
@@ -344,6 +364,17 @@ New Compiler Flags
   attribute the replaceable global new and delete operators behave normally
   (like other functions) with respect to visibility attributes, pragmas and
   options (e.g ``--fvisibility=``).
+* Full register names can be used when printing assembly via ``-mregnames``.
+  This option now matches the one used by GCC.
+
+.. _target_os_detail:
+
+* ``-fdefine-target-os-macros`` and its complement
+  ``-fno-define-target-os-macros``. Enables or disables the Clang extension to
+  provide built-in definitions of a list of ``TARGET_OS_*`` macros based on the
+  target triple.
+
+  The extension is enabled by default for Darwin (Apple platform) targets.
 
 Deprecated Compiler Flags
 -------------------------
@@ -363,6 +394,7 @@ Modified Compiler Flags
 * ``-fvisibility-global-new-delete-hidden`` is now a deprecated spelling of
   ``-fvisibility-global-new-delete=force-hidden`` (``-fvisibility-global-new-delete=``
   is new in this release).
+* ``-fprofile-update`` is enabled for ``-fprofile-generate``.
 
 Removed Compiler Flags
 -------------------------
@@ -860,6 +892,9 @@ Bug Fixes in This Version
   Fixes (`#78290 <https://github.com/llvm/llvm-project/issues/78290>`_)
 - Fixed assertion failure with deleted overloaded unary operators.
   Fixes (`#78314 <https://github.com/llvm/llvm-project/issues/78314>`_)
+- The XCOFF object file format does not support aliases to symbols having common
+  linkage. Clang now diagnoses the use of an alias for a common symbol when
+  compiling for AIX.
 
 - Clang now doesn't produce false-positive warning `-Wconstant-logical-operand`
   for logical operators in C23.
@@ -1261,6 +1296,16 @@ CUDA Support
 - Clang now supports CUDA SDK up to 12.3
 - Added support for sm_90a
 
+PowerPC Support
+^^^^^^^^^^^^^^^
+
+- Added ``nmmintrin.h`` to intrinsics headers.
+- Added ``__builtin_ppc_fence`` as barrier of code motion, and
+  ``__builtin_ppc_mffsl`` for corresponding instruction.
+- Supported ``__attribute__((target("tune=cpu")))``.
+- Emit ``float-abi`` module flag on 64-bit ELFv2 PowerPC targets if
+  ``long double`` type is used in current module.
+
 AIX Support
 ^^^^^^^^^^^
 
@@ -1269,6 +1314,10 @@ AIX Support
   base is encoded as an immediate operand.
   This access sequence is not used for TLS variables larger than 32KB, and is
   currently only supported on 64-bit mode.
+- Inline assembler supports VSR register in pure digits.
+- Enabled ThinLTO support. Requires AIX 7.2 TL5 SP7 or newer, or AIX 7.3 TL2
+  or newer. Similar to the LTO support on AIX, ThinLTO is implemented with
+  the libLTO.so plugin.
 
 WebAssembly Support
 ^^^^^^^^^^^^^^^^^^^
@@ -1332,6 +1381,8 @@ libclang
 - Exposed arguments of ``clang::annotate``.
 - ``clang::getCursorKindForDecl`` now recognizes linkage specifications such as
   ``extern "C"`` and reports them as ``CXCursor_LinkageSpec``.
+- Changed the libclang library on AIX to export only the necessary symbols to
+  prevent issues of resolving to the wrong duplicate symbol.
 
 Static Analyzer
 ---------------
@@ -1342,9 +1393,6 @@ New features
 - Implemented the ``[[clang::suppress]]`` attribute for suppressing diagnostics
   of static analysis tools, such as the Clang Static Analyzer.
   `Documentation <https://clang.llvm.org/docs/AttributeReference.html#suppress>`__.
-
-- Added support for the ``cleanup`` attribute.
-  `Documentation <https://clang.llvm.org/docs/AttributeReference.html#cleanup>`__.
 
 - Support "Deducing this" (P0847R7). (Worked out of the box)
   (`af4751738db8 <https://github.com/llvm/llvm-project/commit/af4751738db89a142a8880c782d12d4201b222a8>`__)
