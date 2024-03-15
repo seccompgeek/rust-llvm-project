@@ -1103,6 +1103,8 @@ Bug Fixes to C++ Support
   (`#82258 <https://github.com/llvm/llvm-project/issues/82258>`_)
 - Correctly immediate-escalate lambda conversion functions.
   (`#82258 <https://github.com/llvm/llvm-project/issues/82258>`_)
+- Fix a crash when an unresolved overload set is encountered on the RHS of a ``.*`` operator.
+  (`#53815 <https://github.com/llvm/llvm-project/issues/53815>`_)
 
 Bug Fixes to AST Handling
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1324,6 +1326,11 @@ AIX Support
 - Enabled ThinLTO support. Requires AIX 7.2 TL5 SP7 or newer, or AIX 7.3 TL2
   or newer. Similar to the LTO support on AIX, ThinLTO is implemented with
   the libLTO.so plugin.
+
+SystemZ Support
+^^^^^^^^^^^^^^^
+- Properly support 16 byte atomic int/fp types and ops. Atomic __int128 (and
+  long double) variables are now aligned to 16 bytes by default (like gcc 14).
 
 WebAssembly Support
 ^^^^^^^^^^^^^^^^^^^

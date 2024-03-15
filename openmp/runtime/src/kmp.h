@@ -1403,9 +1403,19 @@ extern void __kmp_query_cpuid(kmp_cpuinfo_t *p);
 // subleaf is only needed for cache and topology discovery and can be set to
 // zero in most cases
 static inline void __kmp_x86_cpuid(int leaf, int subleaf, struct kmp_cpuid *p) {
+#if KMP_ARCH_X86 && (defined(__pic__) || defined(__PIC__))
+  // on i386 arch, the ebx reg. is used by pic, thus we need to preserve from
+  // being trashed beforehand
+  __asm__ __volatile__("mov %%ebx, %%edi\n"
+                       "cpuid\n"
+                       "xchg %%edi, %%ebx\n"
+                       : "=a"(p->eax), "=b"(p->ebx), "=c"(p->ecx), "=d"(p->edx)
+                       : "a"(leaf), "c"(subleaf));
+#else
   __asm__ __volatile__("cpuid"
                        : "=a"(p->eax), "=b"(p->ebx), "=c"(p->ecx), "=d"(p->edx)
                        : "a"(leaf), "c"(subleaf));
+#endif
 }
 // Load p into FPU control word
 static inline void __kmp_load_x87_fpu_control_word(const kmp_int16 *p) {
@@ -2506,7 +2516,7 @@ typedef struct kmp_depend_info {
   union {
     kmp_uint8 flag; // flag as an unsigned char
     struct { // flag as a set of 8 bits
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
       /* Same fields as in the #else branch, but in reverse order */
       unsigned all : 1;
       unsigned unused : 3;
@@ -2671,7 +2681,7 @@ typedef struct kmp_task_stack {
 #endif // BUILD_TIED_TASK_STACK
 
 typedef struct kmp_tasking_flags { /* Total struct must be exactly 32 bits */
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
   /* Same fields as in the #else branch, but in reverse order */
 #if OMPX_TASKGRAPH
   unsigned reserved31 : 6;
