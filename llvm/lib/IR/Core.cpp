@@ -2032,6 +2032,35 @@ LLVMValueMetadataEntry *LLVMGlobalCopyAllMetadata(LLVMValueRef Value,
   });
 }
 
+/*
+ * Rust-MTE: @kymartin
+ * Mark beginning of unsafe block.
+ */
+void LLVMMarkUnsafeStart(LLVMModuleRef Module, LLVMBuilderRef Builder) {
+  static unsigned long UNSAFE_START = 1;
+  auto module = unwrap(Module);
+  auto builder = unwrap(Builder);
+  auto &context = module->getContext();
+  auto callee = llvm::cast<GlobalVariable>(module->getOrInsertGlobal("METASAFE_UNSAFE_START", llvm::Type::getInt64Ty(context)));
+  Constant* value = ConstantInt::get(llvm::Type::getInt64Ty(context), llvm::APInt(64, UNSAFE_START++));
+  builder->CreateStore(value, callee);
+}
+
+/*
+ * Rust-MTE: @kymartin
+ * Mark end of an unsafe block. This is only for recognizing unsafe blocks.
+ * They should be removed when in release mode.
+ */
+void LLVMMarkUnsafeEnd(LLVMModuleRef Module, LLVMBuilderRef Builder) {
+  static unsigned long UNSAFE_END = 1;
+  auto module = unwrap(Module);
+  auto builder = unwrap(Builder);
+  auto &context = module->getContext();
+  auto callee = llvm::cast<GlobalVariable>(module->getOrInsertGlobal("METASAFE_UNSAFE_END", llvm::Type::getInt64Ty(context)));
+  Constant* value = ConstantInt::get(llvm::Type::getInt64Ty(context), llvm::APInt(64, UNSAFE_END++));
+  builder->CreateStore(value, callee);
+}
+
 unsigned LLVMValueMetadataEntriesGetKind(LLVMValueMetadataEntry *Entries,
                                          unsigned Index) {
   LLVMOpaqueValueMetadataEntry MVE =

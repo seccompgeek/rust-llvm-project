@@ -1144,6 +1144,12 @@ LLVMValueRef LLVMGetFirstFunction(LLVMModuleRef M);
  */
 LLVMValueRef LLVMGetLastFunction(LLVMModuleRef M);
 
+/*
+ * Rust-MTE: @kymartin
+ */
+void LLVMMarkUnsafeStart(LLVMModuleRef Module, LLVMBuilderRef Builder);
+void LLVMMarkUnsafeEnd(LLVMModuleRef Module, LLVMBuilderRef Builder);
+
 /**
  * Advance a Function iterator to the next Function.
  *
